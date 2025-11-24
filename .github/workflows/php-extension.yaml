@@ -1,0 +1,260 @@
+name: PHP Extension
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        description: The PHP version
+        required: true
+      php-variant:
+        type: string
+        description: The PHP variant
+        required: true
+      extension:
+        type: string
+        description: The extension
+        required: true
+
+jobs:
+  extension-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      php-version: ${{ steps.extension-version.outputs.php-version }}
+      ext-version: ${{ steps.extension-version.outputs.ext-version }}
+      ext-version-var: ${{ steps.extension-version.outputs.ext-version-var }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Get extension version
+        id: extension-version
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          EXTENSION: ${{ inputs.extension }}
+        run: |
+          set -euo pipefail
+
+          PHP_VERSION=$(./.github/hcl_get_variable.sh vars-${INPUT_PHP_VERSION}.hcl PHP_VERSION)
+          echo "php-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+
+          ext_version_var=$(echo "$EXTENSION" | tr '[:lower:]' '[:upper:]')_VERSION
+          ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+          if [[ -z "$ext_version" ]]; then
+            echo "ext-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+            echo "ext-version-var=PHP_EXT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
+            echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
+          fi
+
+  check-available:
+    needs: [extension-version]
+    runs-on: ubuntu-24.04
+    outputs:
+      available: ${{ steps.check-available.outputs.available }}
+    steps:
+      - name: Check if already available
+        id: check-available
+        env:
+          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          EXTENSION: ${{ inputs.extension }}
+          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
+            | jq -r '.token')
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to get token" >&2
+            exit 1
+          fi
+
+          curl -sf --header "Authorization: Bearer $token" \
+            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
+            | jq -r '.tags[]' \
+            | grep -q "^${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}$" && available=1 || available=0
+
+          echo "available=${available}" >> $GITHUB_OUTPUT
+
+  build-and-test-extension:
+    if: needs.check-available.outputs.available == '0'
+    needs: [extension-version, check-available]
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Docker metadata for extension
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/ext/${{ inputs.extension }}
+          tags: |
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+          annotations: |
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+          bake-target: php-ext-${{ inputs.extension }}-metadata
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build PHP extension
+        uses: docker/bake-action@v6
+        env:
+          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          ${{ needs.extension-version.outputs.ext-version-var }}: ${{ needs.extension-version.outputs.ext-version }}
+        with:
+          source: .
+          files: |
+            ./docker-bake.hcl
+            ./vars.hcl
+            ./vars-${{ inputs.php-version }}.hcl
+            cwd://${{ steps.metadata.outputs.bake-file-tags }}
+            cwd://${{ steps.metadata.outputs.bake-file-annotations }}
+          pull: true
+          set: |
+            *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
+            php-ext-${{ inputs.extension }}.output=type=oci,dest=php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+            php-ext-${{ inputs.extension }}-test.output=type=docker
+            php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
+            php-ext-${{ inputs.extension }}.cache-from=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+            php-ext-${{ inputs.extension }}.cache-to=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
+            php-ext-${{ inputs.extension }}.contexts.php-base=ghcr.io/${{ github.repository }}/php-base:${{ inputs.php-version }}-${{ inputs.php-variant }}
+            php-ext-${{ inputs.extension }}.contexts.php-ext-base=ghcr.io/${{ github.repository }}/php-ext-base:${{ inputs.php-version }}-${{ inputs.php-variant }}
+          targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
+          github-token: ${{ github.token }}
+      - name: Test PHP extension
+        continue-on-error: true
+        env:
+          TEST_IMAGE: localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
+        run: |
+          set -e
+
+          docker run --rm \
+            --pull=never \
+            "$TEST_IMAGE"
+      - name: Upload PHP extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+
+  merge-extension-images:
+    needs: [extension-version, build-and-test-extension]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download PHP extension artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          merge-multiple: true
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Merge PHP extension images
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          EXTENSION: ${{ inputs.extension }}
+          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          IS_MASTER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+        run: |
+          set -e
+
+          ARCHS=(amd64 arm64)
+
+          tags=()
+          for arch in "${ARCHS[@]}"
+          do
+            archive="php-ext-${EXTENSION}-${EXTENSION_VERSION}-php${INPUT_PHP_VERSION}-${PHP_VARIANT}-${arch}.tar"
+            if [[ ! -f "$archive" ]]; then
+              echo "$archive does not exist" >&2
+              exit 1
+            fi
+
+            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}-${arch}"
+            if [[ "$IS_MASTER" != "1" ]]; then
+              tag="${tag}-${GITHUB_SHA::8}"
+            fi
+
+            skopeo --override-arch="$arch" copy oci-archive:"$archive" docker://"$tag"
+            tags+=("$tag")
+          done
+
+          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
+          if [[ "$IS_MASTER" != "1" ]]; then
+            target_tag="${target_tag}-${GITHUB_SHA::8}"
+          fi
+          docker buildx imagetools create "${tags[@]}" --tag "${target_tag}"
+
+  tag-images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [extension-version, merge-extension-images]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag Extension images
+        env:
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          EXTENSION: ${{ inputs.extension }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
+          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          tags=()
+          for arch in "${ARCHS[@]}"
+          do
+            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}-${arch}"
+            if [[ "$IS_MASTER" != "1" ]]; then
+              tag="${tag}-${GITHUB_SHA::8}"
+            fi
+            tags+=("$tag")
+          done
+
+          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
+          if [[ "$IS_MASTER" != "1" ]]; then
+            target_tag="${target_tag}-${GITHUB_SHA::8}"
+          fi
+          docker buildx imagetools create "${tags[@]}" --tag "${target_tag}"

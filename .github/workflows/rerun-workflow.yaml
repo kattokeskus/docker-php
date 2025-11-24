@@ -1,0 +1,60 @@
+name: Rerun workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        type: string
+        description: The ID of the workflow to rerun
+        required: true
+
+permissions:
+  actions: write
+
+jobs:
+  rerun-workflow:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Wait until run is finished
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          completed=0
+          # Wait at maximum 10 minutes (60 iterations * 10 seconds)
+          for i in {1..60}; do
+            echo "Checking run finished (attempt $i/60)..."
+
+            status=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              /repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID} \
+              --jq '.status')
+
+            if [[ "$status" == "completed" ]]; then
+              completed=1
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ $completed -eq 0 ]]; then
+            echo "Run did not finish in 10 minutes"
+          fi
+      - name: Rerun workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/rerun-failed-jobs
+

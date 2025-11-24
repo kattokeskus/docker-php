@@ -1,0 +1,276 @@
+name: Docker
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        description: The PHP version
+        required: true
+      php-variant:
+        type: string
+        description: The PHP variant
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  php-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      php-version: ${{ steps.php-version.outputs.php-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Get php version
+        id: php-version
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+        run: |
+          set -euo pipefail
+          PHP_VERSION=$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_VERSION)
+          echo "php-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+
+  check-base-images:
+    needs: [php-version]
+    runs-on: ubuntu-24.04
+    outputs:
+      available: ${{ steps.check-base-images.outputs.available }}
+    steps:
+      - name: Check if base images are already built
+        id: check-base-images
+        env:
+          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
+            | jq -r '.token')
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to get token" >&2
+            exit 1
+          fi
+
+          curl -sf --header "Authorization: Bearer $token" \
+            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/tags/list" \
+            | jq -r '.tags[]' \
+            | grep -q "^${PHP_VERSION}-${PHP_VARIANT}$" && available=1 || available=0
+
+          echo "available=${available}" >> $GITHUB_OUTPUT
+
+  build-base-images:
+    needs: [php-version, check-base-images]
+    if: needs.check-base-images.outputs.available == '0'
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+      # Try to build all images even some failed to build
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker metadata for php-base
+        id: metadata-php-base
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/php-base-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          tags: |
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PHP Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          annotations: |
+            org.opencontainers.image.title=PHP Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          bake-target: php-base-metadata
+      - name: Docker metadata for php-ext-base
+        id: metadata-php-ext-base
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/php-ext-base-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          tags: |
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          annotations: |
+            org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          bake-target: php-ext-base-metadata
+      - name: Build PHP base images
+        uses: docker/bake-action@v6
+        env:
+          PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+        with:
+          source: .
+          files: |
+            ./docker-bake.hcl
+            ./vars-${{ inputs.php-version }}.hcl
+            cwd://${{ steps.metadata-php-base.outputs.bake-file-tags }}
+            cwd://${{ steps.metadata-php-base.outputs.bake-file-annotations }}
+            cwd://${{ steps.metadata-php-ext-base.outputs.bake-file-tags }}
+            cwd://${{ steps.metadata-php-ext-base.outputs.bake-file-annotations }}
+          pull: true
+          set: |
+            *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
+            php-base.output=type=oci,dest=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+            php-base.cache-from=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+            php-base.cache-to=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
+            php-ext-base.output=type=oci,dest=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+            php-ext-base.cache-from=type=gha,scope=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+            php-ext-base.cache-to=type=gha,scope=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
+          targets: php-base,php-ext-base
+          github-token: ${{ github.token }}
+      - name: Add platform to manifests
+        env:
+          PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          ARCH: ${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+        run: |
+          set -euo pipefail
+
+          IMAGES=(php-base php-ext-base)
+
+          for image in "${IMAGES[@]}"
+          do
+            archive="${image}-${PHP_VERSION}-${PHP_VARIANT}-${ARCH}.tar"
+            if [[ ! -f "$archive" ]]; then
+              echo "$archive does not exist" >&2
+              exit 1
+            fi
+
+            dir="${image}-${PHP_VERSION}-${PHP_VARIANT}-${ARCH}"
+            rm -rf "$dir"
+            mkdir -p "$dir"
+            tar -xf "$archive" -C "$dir"
+            manifest="$(cat "$dir/index.json")"
+            echo "$manifest" | jq -r ".manifests[].platform = {\"os\": \"linux\", \"architecture\": \"${ARCH}\"}" > "$dir/index.json"
+            archive_realpath="$(realpath "$archive")"
+            pushd "$dir"
+            tar -cf "$archive_realpath" *
+            popd
+            rm -rf "$dir"
+          done
+      - name: Upload php-base artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+      - name: Upload php-ext-base artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+
+  merge-base-images:
+    needs: [php-version, build-base-images]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .github/oci_merge_archives.sh
+          sparse-checkout-cone-mode: false
+      - name: Download php-base artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          merge-multiple: true
+      - name: Download php-ext-base artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          merge-multiple: true
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Merge PHP php images
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          ARCHS=(amd64 arm64)
+
+          IMAGES=(php-base php-ext-base)
+
+          # Check artifacts exists
+          for image in "${IMAGES[@]}"
+          do
+            tags=()
+            for arch in "${ARCHS[@]}"
+            do
+              archive="${image}-${INPUT_PHP_VERSION}-${PHP_VARIANT}-${arch}.tar"
+              if [[ ! -f "$archive" ]]; then
+                echo "$archive does not exist" >&2
+                exit 1
+              fi
+
+              tag="ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}-${arch}"
+              skopeo --override-arch="$arch" copy oci-archive:"$archive" docker://"$tag"
+              tags+=("$tag")
+            done
+
+            docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
+          done
+
+  parse-extensions:
+    runs-on: ubuntu-24.04
+    outputs:
+      extensions: ${{ steps.parse-extensions.outputs.extensions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            *.hcl
+            .github/hcl_get_group.sh
+          sparse-checkout-cone-mode: false
+      - name: Parse extensions
+        id: parse-extensions
+        run: |
+          set -euo pipefail
+
+          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+
+  build-and-test-extensions:
+    needs: [check-base-images, merge-base-images, parse-extensions]
+    if: >-
+      always() && !cancelled() &&
+      needs.check-base-images.result == 'success' &&
+      needs.parse-extensions.result == 'success' &&
+      (needs.check-base-images.outputs.available == '1' || needs.merge-base-images.result == 'success')
+    uses: ./.github/workflows/php-variant-extensions.yaml
+    with:
+      php-version: ${{ inputs.php-version }}
+      php-variant: ${{ inputs.php-variant }}
+      extensions: ${{ needs.parse-extensions.outputs.extensions }}

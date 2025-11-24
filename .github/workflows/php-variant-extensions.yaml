@@ -1,0 +1,33 @@
+name: All PHP Extensions for a Variant
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        type: string
+        description: The PHP version
+        required: true
+      php-variant:
+        type: string
+        description: The PHP variant
+        required: true
+      extensions:
+        type: string
+        description: Extensions as json array
+        required: true
+
+jobs:
+  build-extensions:
+    strategy:
+      matrix:
+        extension: ${{ fromJSON(inputs.extensions) }}
+      fail-fast: false
+    uses: ./.github/workflows/php-extension.yaml
+    with:
+      php-version: ${{ inputs.php-version }}
+      php-variant: ${{ inputs.php-variant }}
+      extension: ${{ matrix.extension }}
