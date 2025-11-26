@@ -19,6 +19,10 @@ on:
         type: string
         description: The extension
         required: true
+      base-tag-name:
+        type: string
+        description: Base tag name
+        required: true
 
 jobs:
   extension-version:
@@ -107,12 +111,12 @@ jobs:
           labels: |
             org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
             org.opencontainers.image.description=
-            org.opencontainers.image.revision=
+            org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           annotations: |
             org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
             org.opencontainers.image.description=
-            org.opencontainers.image.revision=
+            org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           bake-target: php-ext-${{ inputs.extension }}-metadata
       - name: Login to Github Container Registry
@@ -147,8 +151,8 @@ jobs:
             php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
             php-ext-${{ inputs.extension }}.cache-from=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
             php-ext-${{ inputs.extension }}.cache-to=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
-            php-ext-${{ inputs.extension }}.contexts.php-base=ghcr.io/${{ github.repository }}/php-base:${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
-            php-ext-${{ inputs.extension }}.contexts.php-ext-base=ghcr.io/${{ github.repository }}/php-ext-base:${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            php-ext-${{ inputs.extension }}.contexts.php-base=ghcr.io/${{ github.repository }}/php-base:${{ inputs.base-tag-name }}
+            php-ext-${{ inputs.extension }}.contexts.php-ext-base=ghcr.io/${{ github.repository }}/php-ext-base:${{ inputs.base-tag-name }}
           targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
           github-token: ${{ github.token }}
       - name: Test PHP extension
