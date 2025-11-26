@@ -43,12 +43,12 @@ jobs:
           labels: |
             org.opencontainers.image.title=PHP Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
-            org.opencontainers.image.revision=
+            org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
             org.opencontainers.image.version=
           annotations: |
             org.opencontainers.image.title=PHP Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
-            org.opencontainers.image.revision=
+            org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
             org.opencontainers.image.version=
           bake-target: php-base-metadata
       - name: Docker metadata for php-ext-base
@@ -61,13 +61,17 @@ jobs:
           labels: |
             org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
-            org.opencontainers.image.revision=
+            org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
+            org.opencontainers.image.version=
+          annotations: |
+            org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
             org.opencontainers.image.version=
           bake-target: php-ext-base-metadata
       - name: Get build hash
         id: build-hash
         env:
-          DOCKERFILE_HASH: ${{ hashFiles('php/Dockerfile') }}
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
@@ -92,7 +96,7 @@ jobs:
           cat build-hash.json
           build_hash=$(sha256sum build-hash.json | cut -d' ' -f1)
 
-          echo "build-hash=${DOCKERFILE_HASH}-${build_hash}" >> $GITHUB_OUTPUT
+          echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
 
           rm build-hash.json
 
@@ -302,12 +306,12 @@ jobs:
                 exit 1
               fi
 
-              tag="ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}-${arch}"
+              tag="ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}-${arch}"
               skopeo --override-arch="$arch" copy oci-archive:"$archive" docker://"$tag"
               tags+=("$tag")
             done
 
-            docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}-${BUILD_HASH}"
+            docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
 
             if [[ "$IS_MASTER" = "1" ]]; then
               docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
@@ -345,4 +349,4 @@ jobs:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
       extensions: ${{ needs.parse-extensions.outputs.extensions }}
-      base-tag-name: ${{ needs.php-version.outputs.php-version }}-${{ inputs.php-variant }}-${{ needs.php-version.outputs.build-hash }}
+      base-tag-name: build-${{ needs.php-version.outputs.build-hash }}
