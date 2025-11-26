@@ -147,8 +147,8 @@ jobs:
             php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
             php-ext-${{ inputs.extension }}.cache-from=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
             php-ext-${{ inputs.extension }}.cache-to=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
-            php-ext-${{ inputs.extension }}.contexts.php-base=ghcr.io/${{ github.repository }}/php-base:${{ inputs.php-version }}-${{ inputs.php-variant }}
-            php-ext-${{ inputs.extension }}.contexts.php-ext-base=ghcr.io/${{ github.repository }}/php-ext-base:${{ inputs.php-version }}-${{ inputs.php-variant }}
+            php-ext-${{ inputs.extension }}.contexts.php-base=ghcr.io/${{ github.repository }}/php-base:${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            php-ext-${{ inputs.extension }}.contexts.php-ext-base=ghcr.io/${{ github.repository }}/php-ext-base:${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
           github-token: ${{ github.token }}
       - name: Test PHP extension
