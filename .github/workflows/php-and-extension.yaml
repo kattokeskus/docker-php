@@ -69,6 +69,7 @@ jobs:
         env:
           DOCKERFILE_HASH: ${{ hashFiles('php/Dockerfile') }}
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
           PHP_BASE_BAKE_FILE_TAGS: ${{ steps.metadata-php-base.outputs.bake-file-tags }}
           PHP_BASE_BAKE_FILE_ANNOTATIONS: ${{ steps.metadata-php-base.outputs.bake-file-annotations }}
@@ -79,7 +80,8 @@ jobs:
 
           docker buildx bake --print \
             -f docker-bake.hcl \
-            -f "vars-${PHP_VERSION}.hcl" \
+            -f "vars.hcl" \
+            -f "vars-${INPUT_PHP_VERSION}.hcl" \
             -f "${PHP_BASE_BAKE_FILE_TAGS}" \
             -f "${PHP_BASE_BAKE_FILE_ANNOTATIONS}" \
             -f "${PHP_EXT_BASE_BAKE_FILE_TAGS}" \
@@ -189,6 +191,7 @@ jobs:
           source: .
           files: |
             ./docker-bake.hcl
+            ./vars.hcl
             ./vars-${{ inputs.php-version }}.hcl
             cwd://${{ steps.metadata-php-base.outputs.bake-file-tags }}
             cwd://${{ steps.metadata-php-base.outputs.bake-file-annotations }}
