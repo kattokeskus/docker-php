@@ -130,7 +130,7 @@ jobs:
           curl -sf --header "Authorization: Bearer $token" \
             "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/tags/list" \
             | jq -r '.tags[]' \
-            | grep -q "^${PHP_VERSION}-${PHP_VARIANT}-${BUILD_HASH}$" && available=1 || available=0
+            | grep -q "^build-${BUILD_HASH}$" && available=1 || available=0
 
           echo "available=${available}" >> $GITHUB_OUTPUT
 
