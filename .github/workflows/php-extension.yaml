@@ -31,6 +31,7 @@ jobs:
       php-version: ${{ steps.extension-version.outputs.php-version }}
       ext-version: ${{ steps.extension-version.outputs.ext-version }}
       ext-version-var: ${{ steps.extension-version.outputs.ext-version-var }}
+      build-hash: ${{ steps.build-hash.outputs.build-hash }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -54,6 +55,70 @@ jobs:
             echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
             echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
           fi
+      - name: Docker metadata for extension
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/ext/${{ inputs.extension }}
+          tags: |
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+          annotations: |
+            org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=
+            org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+          bake-target: php-ext-${{ inputs.extension }}-metadata
+      - name: Get build hash
+        id: build-hash
+        env:
+          PHP_VERSION: ${{ steps.extension-version.outputs.php-version }}
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          PHP_EXT_BAKE_FILE_TAGS: ${{ steps.metadata.outputs.bake-file-tags }}
+          PHP_EXT_BAKE_FILE_ANNOTATIONS: ${{ steps.metadata.outputs.bake-file-annotations }}
+          EXTENSION: ${{ inputs.extension }}
+        run: |
+          set -euo pipefail
+
+          docker buildx bake --print \
+            -f docker-bake.hcl \
+            -f "vars.hcl" \
+            -f "vars-${INPUT_PHP_VERSION}.hcl" \
+            -f "${PHP_EXT_METADATA_BAKE_FILE_TAGS}" \
+            -f "${PHP_EXT_METADATA_BAKE_FILE_ANNOTATIONS}" \
+            php-ext-${EXTENSION} php-ext-${EXTENSION}-test \
+            > build-hash.json
+
+          cat build-hash.json
+
+          # Parse context
+          context="$(cat build-hash.json | jq -r '.target.php-ext-${EXTENSION}.context')"
+          test_context="$(cat build-hash.json | jq -r '.target.php-ext-${EXTENSION}-test.context')"
+
+          if [[ ! -d "$context" ]]; then
+            echo "Context directory does not exist" >&2
+            exit 1
+          fi
+
+          if [[ "$context" != "$test_context" ]]; then
+            echo "Context and test context are different" >&2
+            exit 1
+          fi
+
+          # Hash files in context
+          hash_files="$(find "$context" -type f -excec cat {} + | sha256sum | cut -d' ' -f1)"
+          # Append to json
+          cat build-hash.json | jq -r --arg hash "$hash_files" '. + {context_hash: $hash}' > build-hash-full.json
+
+          echo "build-hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+          rm build-hash.json
+          rm build-hash-full.json
 
   check-available:
     needs: [extension-version]
@@ -71,6 +136,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
+          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
         run: |
           set -euo pipefail
 
@@ -86,7 +152,7 @@ jobs:
           curl -sf --header "Authorization: Bearer $token" \
             "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
             | jq -r '.tags[]' \
-            | grep -q "^${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}$" && available=1 || available=0
+            | grep -q "^build-${BUILD_HASH}$" && available=1 || available=0
 
           echo "available=${available}" >> $GITHUB_OUTPUT
 
@@ -194,8 +260,8 @@ jobs:
           EXTENSION: ${{ inputs.extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SHA: ${{ github.sha }}
           IS_MASTER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
         run: |
           set -e
 
@@ -210,55 +276,17 @@ jobs:
               exit 1
             fi
 
-            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}-${arch}"
-            if [[ "$IS_MASTER" != "1" ]]; then
-              tag="${tag}-${GITHUB_SHA::8}"
-            fi
+            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}-${arch}"
 
             skopeo --override-arch="$arch" copy oci-archive:"$archive" docker://"$tag"
             tags+=("$tag")
           done
 
-          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
-          if [[ "$IS_MASTER" != "1" ]]; then
-            target_tag="${target_tag}-${GITHUB_SHA::8}"
+          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
+          docker buildx imagetools create "${tags[@]}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
+
+          if [[ "$IS_MASTER" = "1" ]]; then
+            docker buildx imagetools create "${tags[@]}" \
+              --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
           fi
-          docker buildx imagetools create "${tags[@]}" --tag "${target_tag}"
-
-  tag-images:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [extension-version, merge-extension-images]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Login to Github Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Tag Extension images
-        env:
-          PHP_VARIANT: ${{ inputs.php-variant }}
-          EXTENSION: ${{ inputs.extension }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
-          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
-          GITHUB_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          tags=()
-          for arch in "${ARCHS[@]}"
-          do
-            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}-${arch}"
-            if [[ "$IS_MASTER" != "1" ]]; then
-              tag="${tag}-${GITHUB_SHA::8}"
-            fi
-            tags+=("$tag")
-          done
-
-          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
-          if [[ "$IS_MASTER" != "1" ]]; then
-            target_tag="${target_tag}-${GITHUB_SHA::8}"
-          fi
-          docker buildx imagetools create "${tags[@]}" --tag "${target_tag}"
