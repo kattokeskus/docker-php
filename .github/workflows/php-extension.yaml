@@ -67,11 +67,13 @@ jobs:
             org.opencontainers.image.description=
             org.opencontainers.image.revision=
             org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.created=
           annotations: |
             org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=
             org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.created=
           bake-target: php-ext-${{ inputs.extension }}-metadata
       - name: Get build hash
         id: build-hash
@@ -111,7 +113,7 @@ jobs:
           fi
 
           # Hash files in context
-          hash_files="$(find "$context" -type f -excec cat {} + | sha256sum | cut -d' ' -f1)"
+          hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
           # Append to json
           cat build-hash.json | jq -r --arg hash "$hash_files" '. + {context_hash: $hash}' > build-hash-full.json
 

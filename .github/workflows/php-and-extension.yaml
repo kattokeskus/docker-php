@@ -45,11 +45,13 @@ jobs:
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
             org.opencontainers.image.version=
+            org.opencontainers.image.created=
           annotations: |
             org.opencontainers.image.title=PHP Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
             org.opencontainers.image.version=
+            org.opencontainers.image.created=
           bake-target: php-base-metadata
       - name: Docker metadata for php-ext-base
         id: metadata-php-ext-base
@@ -62,12 +64,14 @@ jobs:
             org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
-            org.opencontainers.image.version=
+            org.opencontainers.image.version=${{ steps.php-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.created=
           annotations: |
             org.opencontainers.image.title=PHP Ext Base ${{ inputs.php-version }}-${{ inputs.php-variant }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ hashFiles('php/Dockerfile') }}
-            org.opencontainers.image.version=
+            org.opencontainers.image.version=${{ steps.php-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.created=
           bake-target: php-ext-base-metadata
       - name: Get build hash
         id: build-hash
