@@ -97,8 +97,8 @@ jobs:
           cat build-hash.json
 
           # Parse context
-          context="$(cat build-hash.json | jq -r '.target.php-ext-${EXTENSION}.context')"
-          test_context="$(cat build-hash.json | jq -r '.target.php-ext-${EXTENSION}-test.context')"
+          context="$(cat build-hash.json | jq -r ".target.\"php-ext-${EXTENSION}\".context")"
+          test_context="$(cat build-hash.json | jq -r ".target.\"php-ext-${EXTENSION}-test\".context")"
 
           if [[ ! -d "$context" ]]; then
             echo "Context directory does not exist" >&2
