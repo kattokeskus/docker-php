@@ -61,7 +61,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}/ext/${{ inputs.extension }}
           tags: |
-            type=sha
+            type=raw,value=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           labels: |
             org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
             org.opencontainers.image.description=
