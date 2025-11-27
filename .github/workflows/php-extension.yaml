@@ -236,8 +236,8 @@ jobs:
       - name: Upload PHP extension artifact
         uses: actions/upload-artifact@v4
         with:
-          name: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
-          path: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
 
   merge-extension-images:
     needs: [extension-version, build-and-test-extension]
@@ -246,7 +246,7 @@ jobs:
       - name: Download PHP extension artifacts
         uses: actions/download-artifact@v5
         with:
-          pattern: php-ext-${{ inputs.extension }}-${{ needs.extension-version.outputs.ext-version }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          pattern: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-*
           merge-multiple: true
       - name: Login to Github Container Registry
         uses: docker/login-action@v3
@@ -272,7 +272,7 @@ jobs:
           tags=()
           for arch in "${ARCHS[@]}"
           do
-            archive="php-ext-${EXTENSION}-${EXTENSION_VERSION}-php${INPUT_PHP_VERSION}-${PHP_VARIANT}-${arch}.tar"
+            archive="php-ext-${EXTENSION}-php${INPUT_PHP_VERSION}-${PHP_VARIANT}-${arch}.tar"
             if [[ ! -f "$archive" ]]; then
               echo "$archive does not exist" >&2
               exit 1
