@@ -89,8 +89,8 @@ jobs:
             -f docker-bake.hcl \
             -f "vars.hcl" \
             -f "vars-${INPUT_PHP_VERSION}.hcl" \
-            -f "${PHP_EXT_METADATA_BAKE_FILE_TAGS}" \
-            -f "${PHP_EXT_METADATA_BAKE_FILE_ANNOTATIONS}" \
+            -f "${PHP_EXT_BAKE_FILE_TAGS}" \
+            -f "${PHP_EXT_BAKE_FILE_ANNOTATIONS}" \
             php-ext-${EXTENSION} php-ext-${EXTENSION}-test \
             > build-hash.json
 
