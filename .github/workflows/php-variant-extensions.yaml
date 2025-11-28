@@ -19,6 +19,14 @@ on:
         type: string
         description: Extensions as json array
         required: true
+      extensions-to-build:
+        type: string
+        description: Extensions to build as json array
+        required: true
+      extension-build-hashes:
+        type: string
+        description: Extension build hashes as json object
+        required: true
       base-tag-name:
         type: string
         description: Base tag name
@@ -34,5 +42,7 @@ jobs:
     with:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
-      extension: ${{ matrix.extension }}
-      base-tag-name: ${{ inputs.base-tag-name }}
+      extension: ${{ matrix.extension }} 
+      base-tag-name: ${{ inputs.base-tag-name }} 
+      build: ${{ contains(fromJSON(inputs.extensions-to-build), matrix.extension) && '1' || '0' }}
+      build-hash: ${{ fromJSON(inputs.extension-build-hashes)[matrix.extension] }}

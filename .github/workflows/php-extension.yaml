@@ -23,6 +23,14 @@ on:
         type: string
         description: Base tag name
         required: true
+      build:
+        type: string
+        description: Whether to build the extension (0 or 1)
+        required: true
+      build-hash:
+        type: string
+        description: Build hash
+        required: true
 
 jobs:
   extension-version:
@@ -31,7 +39,6 @@ jobs:
       php-version: ${{ steps.extension-version.outputs.php-version }}
       ext-version: ${{ steps.extension-version.outputs.ext-version }}
       ext-version-var: ${{ steps.extension-version.outputs.ext-version-var }}
-      build-hash: ${{ steps.build-hash.outputs.build-hash }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -55,90 +62,10 @@ jobs:
             echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
             echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
           fi
-      - name: Get build hash
-        id: build-hash
-        env:
-          PHP_VERSION: ${{ steps.extension-version.outputs.php-version }}
-          INPUT_PHP_VERSION: ${{ inputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
-          EXTENSION: ${{ inputs.extension }}
-          BUILD_HASH: ${{ steps.extension-version.outputs.build-hash }}
-        run: |
-          set -euo pipefail
-
-          docker buildx bake --print \
-            -f docker-bake.hcl \
-            -f "vars.hcl" \
-            -f "vars-${INPUT_PHP_VERSION}.hcl" \
-            php-ext-${EXTENSION} php-ext-${EXTENSION}-test \
-            > build-hash.json
-
-          cat build-hash.json
-
-          # Parse context
-          context="$(cat build-hash.json | jq -r ".target.\"php-ext-${EXTENSION}\".context")"
-          test_context="$(cat build-hash.json | jq -r ".target.\"php-ext-${EXTENSION}-test\".context")"
-
-          if [[ ! -d "$context" ]]; then
-            echo "Context directory does not exist" >&2
-            exit 1
-          fi
-          if [[ "$context" != "$test_context" ]]; then
-            echo "Context and test context are different" >&2
-            exit 1
-          fi
-
-          # Add build hash and build context hash to build-hash.json
-          hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
-          # Append to json
-          cat build-hash.json | jq -r --arg context_hash "$hash_files" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}' > build-hash-full.json
-
-          cat build-hash-full.json
-
-          build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
-          echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
-
-          rm build-hash.json  build-hash-full.json
-
-  check-available:
-    needs: [extension-version]
-    runs-on: ubuntu-24.04
-    outputs:
-      available: ${{ steps.check-available.outputs.available }}
-    steps:
-      - name: Check if already available
-        id: check-available
-        env:
-          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
-          EXTENSION: ${{ inputs.extension }}
-          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ github.token }}
-          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
-        run: |
-          set -euo pipefail
-
-          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
-            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
-            | jq -r '.token')
-
-          if [[ -z "$token" ]]; then
-            echo "Failed to get token" >&2
-            exit 1
-          fi
-
-          curl -sf --header "Authorization: Bearer $token" \
-            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
-            | jq -r '.tags[]' \
-            | grep -q "^build-${BUILD_HASH}$" && available=1 || available=0
-
-          echo "available=${available}" >> $GITHUB_OUTPUT
 
   build-and-test-extension:
-    if: needs.check-available.outputs.available == '0'
-    needs: [extension-version, check-available]
+    if: inputs.build == '1'
+    needs: [extension-version]
     strategy:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
@@ -240,7 +167,7 @@ jobs:
           EXTENSION: ${{ inputs.extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
+          BUILD_HASH: ${{ inputs.build-hash }}
         run: |
           set -e
 
@@ -283,7 +210,7 @@ jobs:
           PHP_VARIANT: ${{ inputs.php-variant }}
           EXTENSION: ${{ inputs.extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
-          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
+          BUILD_HASH: ${{ inputs.build-hash }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail

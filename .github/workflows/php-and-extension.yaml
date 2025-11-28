@@ -17,11 +17,34 @@ permissions:
   packages: write
 
 jobs:
+  parse-extensions:
+    runs-on: ubuntu-24.04
+    outputs:
+      extensions: ${{ steps.parse-extensions.outputs.extensions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            *.hcl
+            .github/hcl_get_group.sh
+          sparse-checkout-cone-mode: false
+      - name: Parse extensions
+        id: parse-extensions
+        run: |
+          set -euo pipefail
+
+          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+
+
   php-version:
+    needs: [parse-extensions]
     runs-on: ubuntu-24.04
     outputs:
       php-version: ${{ steps.php-version.outputs.php-version }}
       build-hash: ${{ steps.build-hash.outputs.build-hash }}
+      extensions: ${{ steps.extensions.outputs.extensions }}
+      extension-build-hashes: ${{ steps.extensions.outputs.extension-build-hashes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -75,6 +98,89 @@ jobs:
           echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
 
           rm build-hash.json build-hash-full.json
+      - name: Get extensions to build
+        id: extensions
+        env:
+          EXTENSIONS: ${{ needs.parse-extensions.outputs.extensions }}
+          PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          BUILD_HASH: ${{ steps.build-hash.outputs.build-hash }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
+            | jq -r '.token')
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to get token" >&2
+            exit 1
+          fi
+
+          extensions=()
+          extension_build_hashes='{}'
+          while read -r extension
+          do
+            ext_version_var=$(echo "$extension" | tr '[:lower:]' '[:upper:]')_VERSION
+            ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+            if [[ -z "$ext_version" ]]; then
+              echo "ext-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+              echo "ext-version-var=PHP_EXT_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
+              echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
+            fi
+
+            EXTENSION="$extension" PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+            docker buildx bake --print \
+              -f docker-bake.hcl \
+              -f "vars.hcl" \
+              -f "vars-${INPUT_PHP_VERSION}.hcl" \
+              php-ext-${extension} php-ext-${extension}-test \
+              > build-hash.json
+
+            cat build-hash.json
+
+            # Parse context
+            context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}\".context")"
+            test_context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}-test\".context")"
+
+            if [[ ! -d "$context" ]]; then
+              echo "Context directory does not exist" >&2
+              exit 1
+            fi
+            if [[ "$context" != "$test_context" ]]; then
+              echo "Context and test context are different" >&2
+              exit 1
+            fi
+
+            # Add build hash and build context hash to build-hash.json
+            hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
+            cat build-hash.json | jq -r --arg context_hash "$hash_files" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}' > build-hash-full.json
+
+            cat build-hash-full.json
+
+            build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
+            rm build-hash.json build-hash-full.json
+
+            extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {[$extension]: $build_hash}')"
+
+            curl -sf --header "Authorization: Bearer $token" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
+              | jq -r '.tags[]' \
+              | grep -q "^build-${build_hash:0:7}$" && available=1 || available=0
+
+            if [[ "$available" == "1" ]]; then
+              extensions+=("$extension")
+            fi
+          done < <(echo "$EXTENSIONS" | jq -r '.[]')
+
+          echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
 
   check-base-images:
     needs: [php-version]
@@ -323,25 +429,6 @@ jobs:
               --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${INPUT_PHP_VERSION}-${PHP_VARIANT}"
           done
 
-  parse-extensions:
-    runs-on: ubuntu-24.04
-    outputs:
-      extensions: ${{ steps.parse-extensions.outputs.extensions }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          sparse-checkout: |
-            *.hcl
-            .github/hcl_get_group.sh
-          sparse-checkout-cone-mode: false
-      - name: Parse extensions
-        id: parse-extensions
-        run: |
-          set -euo pipefail
-
-          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
-
   build-and-test-extensions:
     needs: [php-version, check-base-images, merge-base-images, parse-extensions]
     if: >-
@@ -353,5 +440,7 @@ jobs:
     with:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
-      extensions: ${{ needs.parse-extensions.outputs.extensions }}
+      extensions: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.parse-extensions.outputs.extensions || needs.php-version.outputs.extensions }}
+      extensions-to-build: ${{ needs.php-version.outputs.extensions }}
+      extension-build-hashes: ${{ needs.php-version.outputs.extension-build-hashes }}
       base-tag-name: build-${{ needs.php-version.outputs.build-hash }}
