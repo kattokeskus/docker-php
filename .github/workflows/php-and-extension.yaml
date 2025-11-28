@@ -261,7 +261,6 @@ jobs:
           PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          IS_MASTER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
           BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
         run: |
           set -euo pipefail
@@ -288,10 +287,40 @@ jobs:
             done
 
             docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
+          done
 
-            if [[ "$IS_MASTER" = "1" ]]; then
-              docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
-            fi
+  tag-main-images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [php-version, merge-base-images]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag main images
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          IMAGES=(php-base php-ext-base)
+
+          # Check artifacts exists
+          for image in "${IMAGES[@]}"
+          do
+            docker buildx imagetools create \
+              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
+              --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
+
+            docker buildx imagetools create \
+              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}" \
+              --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${INPUT_PHP_VERSION}-${PHP_VARIANT}"
           done
 
   parse-extensions:

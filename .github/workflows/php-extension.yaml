@@ -270,3 +270,36 @@ jobs:
             docker buildx imagetools create "${tags[@]}" \
               --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
           fi
+
+  tag-main-images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [extension-version, merge-extension-images]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag main images
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          docker buildx imagetools create \
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
+
+          docker buildx imagetools create \
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:php${PHP_VERSION}-${PHP_VARIANT}"
+
+          docker buildx imagetools create \
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:php${INPUT_PHP_VERSION}-${PHP_VARIANT}"
