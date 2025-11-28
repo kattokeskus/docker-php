@@ -395,7 +395,11 @@ jobs:
           done
 
   tag-main-images:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      always() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.php-version.result == 'success' &&
+      (needs.merge-base-images.result == 'success' || needs.merge-base-images.result == 'skipped')
     needs: [php-version, merge-base-images]
     runs-on: ubuntu-24.04
     steps:
