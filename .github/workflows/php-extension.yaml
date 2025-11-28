@@ -240,7 +240,6 @@ jobs:
           EXTENSION: ${{ inputs.extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          IS_MASTER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
           BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
         run: |
           set -e
@@ -265,11 +264,6 @@ jobs:
           target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
           docker buildx imagetools create "${tags[@]}" \
             --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
-
-          if [[ "$IS_MASTER" = "1" ]]; then
-            docker buildx imagetools create "${tags[@]}" \
-              --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
-          fi
 
   tag-main-images:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
