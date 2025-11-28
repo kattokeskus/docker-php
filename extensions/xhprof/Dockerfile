@@ -49,7 +49,13 @@ RUN mkdir -p /install/php-ext \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable xhprof' \
-        && echo 'php -m | grep -q "^xhprof$"' \
+        && echo 'FOUND_MODULE=$(php -m | grep "^xhprof$" | head -n1)' \
+        && echo '[ "$FOUND_MODULE" = "xhprof" ] || ( \\' \
+        && echo '  php -m \\' \
+        && echo '  && echo "xhprof extension not active" >&2 \\' \
+        && echo '  && php -m | grep "^xhprof$" \\' \
+        && echo '  && exit 1 \\' \
+        && echo ')' \
     ) > /install/install.sh \
     && chmod +x /install/install.sh \
     && cp /usr/local/lib/php/extensions/*/xhprof.so \
