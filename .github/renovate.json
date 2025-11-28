@@ -1,6 +1,9 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+    "extends": [
+        "config:recommended",
+        "helpers:pinGitHubActionDigests"
+    ],
     "major": {
         "dependencyDashboardApproval": true
     },
@@ -9,34 +12,61 @@
     ],
     "prHourlyLimit": 0,
     "fetchChangeLogs": "off",
-    "baseBranches": ["main"],
+    "baseBranchPatterns": [
+        "main"
+    ],
     "packageRules": [
         {
-            "matchFileNames": ["vars-8.3.hcl"],
-            "matchDatasources": ["docker"],
-            "matchPackageNames": ["php", "library/php", "docker.io/library/php"],
+            "matchFileNames": [
+                "vars-8.3.hcl"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
+            "matchPackageNames": [
+                "php",
+                "library/php",
+                "docker.io/library/php"
+            ],
             "allowedVersions": "<8.4.0"
         },
         {
-            "matchFileNames": ["vars-8.4.hcl"],
-            "matchDatasources": ["docker"],
-            "matchPackageNames": ["php", "library/php", "docker.io/library/php"],
+            "matchFileNames": [
+                "vars-8.4.hcl"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
+            "matchPackageNames": [
+                "php",
+                "library/php",
+                "docker.io/library/php"
+            ],
             "allowedVersions": "<8.5.0"
         },
         {
             "description": "pecl version extractor",
-            "matchDatasources": ["custom.pecl"],
+            "matchDatasources": [
+                "custom.pecl"
+            ],
             "extractVersion": "version=(?<version>.+)$"
         }
     ],
-    "labels": ["update"],
+    "labels": [
+        "update"
+    ],
     "vulnerabilityAlerts": {
-        "labels": ["update", "security"]
+        "labels": [
+            "update",
+            "security"
+        ]
     },
     "customManagers": [
         {
             "customType": "regex",
-            "managerFilePatterns": ["/\\.hcl$/"],
+            "managerFilePatterns": [
+                "/\\.hcl$/"
+            ],
             "matchStrings": [
                 "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s+default = \"(?<currentValue>[^\"]+)\""
             ]
