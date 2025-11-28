@@ -43,11 +43,30 @@ jobs:
     outputs:
       php-version: ${{ steps.php-version.outputs.php-version }}
       build-hash: ${{ steps.build-hash.outputs.build-hash }}
+      available: ${{ steps.build-hash.outputs.available }}
       extensions: ${{ steps.extensions.outputs.extensions }}
       extension-build-hashes: ${{ steps.extensions.outputs.extension-build-hashes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Registry token
+        id: registry-token
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
+            | jq -r '.token')
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to get token" >&2
+            exit 1
+          fi
+
+          echo "token=${token}" >> $GITHUB_OUTPUT
       - name: Get php version
         id: php-version
         env:
@@ -62,6 +81,7 @@ jobs:
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
+          REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token }}
         run: |
           set -euo pipefail
 
@@ -95,11 +115,21 @@ jobs:
 
           build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
 
-          echo "build-hash=${build_hash:0:7}"
+          echo "build-hash: ${build_hash:0:7}"
 
           echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
 
           rm build-hash.json build-hash-full.json
+
+          # Check if base images are already built
+          curl -sfL \
+            -H "Authorization: Bearer $REGISTRY_TOKEN" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/build-${build_hash:0:7}" \
+            > /dev/null 2>&1 && available=1 || available=0
+
+          echo "available=${available}" >> $GITHUB_OUTPUT
+
       - name: Get extensions to build
         id: extensions
         env:
@@ -111,17 +141,9 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token }}
         run: |
           set -euo pipefail
-
-          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
-            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
-            | jq -r '.token')
-
-          if [[ -z "$token" ]]; then
-            echo "Failed to get token" >&2
-            exit 1
-          fi
 
           extensions=()
           extension_build_hashes='{}'
@@ -167,10 +189,12 @@ jobs:
 
             extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {$extension: $build_hash}')"
 
-            curl -sf --header "Authorization: Bearer $token" \
-              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/tags/list" \
-              | jq -r '.tags[]' \
-              | grep -q "^build-${build_hash:0:7}$" && available=1 || available=0
+            # Check if extension image is already built
+            curl -sfL \
+              -H "Authorization: Bearer $REGISTRY_TOKEN" \
+              -H "Accept: application/vnd.oci.image.index.v1+json" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/build-${build_hash:0:7}" \
+              > /dev/null 2>&1 && available=1 || available=0
 
             if [[ "$available" == "0" ]]; then
               extensions+=("$extension")
@@ -191,43 +215,9 @@ jobs:
           fi
           echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
 
-  check-base-images:
-    needs: [php-version]
-    runs-on: ubuntu-24.04
-    outputs:
-      available: ${{ steps.check-base-images.outputs.available }}
-    steps:
-      - name: Check if base images are already built
-        id: check-base-images
-        env:
-          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
-          BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
-            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
-            | jq -r '.token')
-
-          if [[ -z "$token" ]]; then
-            echo "Failed to get token" >&2
-            exit 1
-          fi
-
-          curl -sf --header "Authorization: Bearer $token" \
-            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/tags/list" \
-            | jq -r '.tags[]' \
-            | grep -q "^build-${BUILD_HASH}$" && available=1 || available=0
-
-          echo "available=${available}" >> $GITHUB_OUTPUT
-
   build-base-images:
-    needs: [php-version, check-base-images]
-    if: needs.check-base-images.outputs.available == '0'
+    needs: [php-version]
+    if: needs.php-version.outputs.available == '0'
     strategy:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
@@ -439,12 +429,12 @@ jobs:
           done
 
   build-and-test-extensions:
-    needs: [php-version, check-base-images, merge-base-images, parse-extensions]
+    needs: [php-version, merge-base-images, parse-extensions]
     if: >-
       always() && !cancelled() &&
-      needs.check-base-images.result == 'success' &&
+      needs.php-version.result == 'success' &&
       needs.parse-extensions.result == 'success' &&
-      (needs.check-base-images.outputs.available == '1' || needs.merge-base-images.result == 'success')
+      (needs.php-version.outputs.available == '1' || needs.merge-base-images.result == 'success')
     uses: ./.github/workflows/php-variant-extensions.yaml
     with:
       php-version: ${{ inputs.php-version }}
