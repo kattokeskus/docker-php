@@ -95,6 +95,8 @@ jobs:
 
           build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
 
+          echo "build-hash=${build_hash:0:7}"
+
           echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
 
           rm build-hash.json build-hash-full.json
@@ -162,8 +164,6 @@ jobs:
             hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
             cat build-hash.json | jq -r --arg context_hash "$hash_files" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}' > build-hash-full.json
 
-            cat build-hash-full.json
-
             build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
             rm build-hash.json build-hash-full.json
 
@@ -178,6 +178,13 @@ jobs:
               extensions+=("$extension")
             fi
           done < <(echo "$EXTENSIONS" | jq -r '.[]')
+
+          echo "extensions:"
+          echo "${extensions[@]}" | tr ' ' '\n'
+          echo
+          echo "extension-build-hashes:"
+          echo "$extension_build_hashes" | jq -r .
+          echo
 
           echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
           echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
