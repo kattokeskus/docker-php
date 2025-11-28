@@ -281,6 +281,8 @@ jobs:
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
+          EXTENSION: ${{ inputs.extension }}
+          EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           BUILD_HASH: ${{ needs.extension-version.outputs.build-hash }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
