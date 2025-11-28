@@ -38,7 +38,7 @@ jobs:
       matrix:
         extension: ${{ fromJSON(inputs.extensions) }}
       fail-fast: false
-      max-parallel: ${{ vars.MAX_PARALLEL }}
+      max-parallel: ${{ fromJSON(vars.MAX_PARALLEL) }}
     uses: ./.github/workflows/php-extension.yaml
     with:
       php-version: ${{ inputs.php-version }}
