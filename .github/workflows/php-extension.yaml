@@ -55,35 +55,14 @@ jobs:
             echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
             echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
           fi
-      - name: Docker metadata for extension
-        id: metadata
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/ext/${{ inputs.extension }}
-          tags: |
-            type=raw,value=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
-          labels: |
-            org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
-            org.opencontainers.image.description=
-            org.opencontainers.image.revision=
-            org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
-            org.opencontainers.image.created=
-          annotations: |
-            org.opencontainers.image.title=PHP ${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
-            org.opencontainers.image.description=
-            org.opencontainers.image.revision=
-            org.opencontainers.image.version=${{ steps.extension-version.outputs.ext-version }}-php${{ steps.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
-            org.opencontainers.image.created=
-          bake-target: php-ext-${{ inputs.extension }}-metadata
       - name: Get build hash
         id: build-hash
         env:
           PHP_VERSION: ${{ steps.extension-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
-          PHP_EXT_BAKE_FILE_TAGS: ${{ steps.metadata.outputs.bake-file-tags }}
-          PHP_EXT_BAKE_FILE_ANNOTATIONS: ${{ steps.metadata.outputs.bake-file-annotations }}
           EXTENSION: ${{ inputs.extension }}
+          BUILD_HASH: ${{ steps.extension-version.outputs.build-hash }}
         run: |
           set -euo pipefail
 
@@ -106,21 +85,22 @@ jobs:
             echo "Context directory does not exist" >&2
             exit 1
           fi
-
           if [[ "$context" != "$test_context" ]]; then
             echo "Context and test context are different" >&2
             exit 1
           fi
 
-          # Hash files in context
+          # Add build hash and build context hash to build-hash.json
           hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
           # Append to json
-          cat build-hash.json | jq -r --arg hash "$hash_files" '. + {context_hash: $hash}' > build-hash-full.json
+          cat build-hash.json | jq -r --arg context_hash "$hash_files" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}' > build-hash-full.json
 
-          echo "build-hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          cat build-hash-full.json
 
-          rm build-hash.json
-          rm build-hash-full.json
+          build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
+          echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
+
+          rm build-hash.json  build-hash-full.json
 
   check-available:
     needs: [extension-version]
