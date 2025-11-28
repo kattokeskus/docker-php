@@ -17,14 +17,56 @@ permissions:
   packages: write
 
 jobs:
+  parse-extensions:
+    runs-on: ubuntu-24.04
+    outputs:
+      extensions: ${{ steps.parse-extensions.outputs.extensions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            *.hcl
+            .github/hcl_get_group.sh
+          sparse-checkout-cone-mode: false
+      - name: Parse extensions
+        id: parse-extensions
+        run: |
+          set -euo pipefail
+
+          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+
+
   php-version:
+    needs: [parse-extensions]
     runs-on: ubuntu-24.04
     outputs:
       php-version: ${{ steps.php-version.outputs.php-version }}
       build-hash: ${{ steps.build-hash.outputs.build-hash }}
+      available: ${{ steps.build-hash.outputs.available }}
+      extensions: ${{ steps.extensions.outputs.extensions }}
+      extension-build-hashes: ${{ steps.extensions.outputs.extension-build-hashes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Registry token
+        id: registry-token
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
+            | jq -r '.token')
+
+          if [[ -z "$token" ]]; then
+            echo "Failed to get token" >&2
+            exit 1
+          fi
+
+          echo "token=${token}" >> $GITHUB_OUTPUT
       - name: Get php version
         id: php-version
         env:
@@ -39,6 +81,7 @@ jobs:
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
+          REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token }}
         run: |
           set -euo pipefail
 
@@ -72,47 +115,109 @@ jobs:
 
           build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
 
+          echo "build-hash: ${build_hash:0:7}"
+
           echo "build-hash=${build_hash:0:7}" >> $GITHUB_OUTPUT
 
           rm build-hash.json build-hash-full.json
 
-  check-base-images:
-    needs: [php-version]
-    runs-on: ubuntu-24.04
-    outputs:
-      available: ${{ steps.check-base-images.outputs.available }}
-    steps:
-      - name: Check if base images are already built
-        id: check-base-images
-        env:
-          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
-          BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          token=$(curl -sf --basic -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" \
-            "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY}:pull" \
-            | jq -r '.token')
-
-          if [[ -z "$token" ]]; then
-            echo "Failed to get token" >&2
-            exit 1
-          fi
-
-          curl -sf --header "Authorization: Bearer $token" \
-            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/tags/list" \
-            | jq -r '.tags[]' \
-            | grep -q "^build-${BUILD_HASH}$" && available=1 || available=0
+          # Check if base images are already built
+          curl -sfL \
+            -H "Authorization: Bearer $REGISTRY_TOKEN" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/build-${build_hash:0:7}" \
+            > /dev/null 2>&1 && available=1 || available=0
 
           echo "available=${available}" >> $GITHUB_OUTPUT
 
+      - name: Get extensions to build
+        id: extensions
+        env:
+          EXTENSIONS: ${{ needs.parse-extensions.outputs.extensions }}
+          PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          BUILD_HASH: ${{ steps.build-hash.outputs.build-hash }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          extensions=()
+          extension_build_hashes='{}'
+          while read -r extension
+          do
+            ext_version_var=$(echo "$extension" | tr '[:lower:]' '[:upper:]')_VERSION
+            ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+            if [[ -z "$ext_version" ]]; then
+              echo "ext-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+              echo "ext-version-var=PHP_EXT_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
+              echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
+            fi
+
+            EXTENSION="$extension" PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+            docker buildx bake --print \
+              -f docker-bake.hcl \
+              -f "vars.hcl" \
+              -f "vars-${INPUT_PHP_VERSION}.hcl" \
+              php-ext-${extension} php-ext-${extension}-test \
+              > build-hash.json
+
+            # Parse context
+            context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}\".context")"
+            test_context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}-test\".context")"
+
+            if [[ ! -d "$context" ]]; then
+              echo "Context directory does not exist" >&2
+              exit 1
+            fi
+            if [[ "$context" != "$test_context" ]]; then
+              echo "Context and test context are different" >&2
+              exit 1
+            fi
+
+            # Add build hash and build context hash to build-hash.json
+            hash_files="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
+            cat build-hash.json | jq -r --arg context_hash "$hash_files" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}' > build-hash-full.json
+
+            build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
+            rm build-hash.json build-hash-full.json
+
+            extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {$extension: $build_hash}')"
+
+            # Check if extension image is already built
+            curl -sfL \
+              -H "Authorization: Bearer $REGISTRY_TOKEN" \
+              -H "Accept: application/vnd.oci.image.index.v1+json" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/build-${build_hash:0:7}" \
+              > /dev/null 2>&1 && available=1 || available=0
+
+            if [[ "$available" == "0" ]]; then
+              extensions+=("$extension")
+            fi
+          done < <(echo "$EXTENSIONS" | jq -r '.[]')
+
+          echo "extensions:"
+          echo "${extensions[@]}" | tr ' ' '\n'
+          echo
+          echo "extension-build-hashes:"
+          echo "$extension_build_hashes" | jq -r .
+          echo
+
+          if [[ ${#extensions[@]} -eq 0 ]]; then
+            echo "extensions=[]" >> $GITHUB_OUTPUT
+          else
+            echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          fi
+          echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
+
   build-base-images:
-    needs: [php-version, check-base-images]
-    if: needs.check-base-images.outputs.available == '0'
+    needs: [php-version]
+    if: needs.php-version.outputs.available == '0'
     strategy:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
@@ -261,7 +366,6 @@ jobs:
           PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          IS_MASTER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
           BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
         run: |
           set -euo pipefail
@@ -288,41 +392,54 @@ jobs:
             done
 
             docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
-
-            if [[ "$IS_MASTER" = "1" ]]; then
-              docker buildx imagetools create "${tags[@]}" --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
-            fi
           done
 
-  parse-extensions:
+  tag-main-images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [php-version, merge-base-images]
     runs-on: ubuntu-24.04
-    outputs:
-      extensions: ${{ steps.parse-extensions.outputs.extensions }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
         with:
-          sparse-checkout: |
-            *.hcl
-            .github/hcl_get_group.sh
-          sparse-checkout-cone-mode: false
-      - name: Parse extensions
-        id: parse-extensions
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag main images
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
+          BUILD_HASH: ${{ needs.php-version.outputs.build-hash }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          IMAGES=(php-base php-ext-base)
 
-          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          # Check artifacts exists
+          for image in "${IMAGES[@]}"
+          do
+            docker buildx imagetools create \
+              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
+              --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
+
+            docker buildx imagetools create \
+              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}" \
+              --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${INPUT_PHP_VERSION}-${PHP_VARIANT}"
+          done
 
   build-and-test-extensions:
-    needs: [php-version, check-base-images, merge-base-images, parse-extensions]
+    needs: [php-version, merge-base-images, parse-extensions]
     if: >-
       always() && !cancelled() &&
-      needs.check-base-images.result == 'success' &&
+      needs.php-version.result == 'success' &&
       needs.parse-extensions.result == 'success' &&
-      (needs.check-base-images.outputs.available == '1' || needs.merge-base-images.result == 'success')
+      (needs.php-version.outputs.available == '1' || needs.merge-base-images.result == 'success')
     uses: ./.github/workflows/php-variant-extensions.yaml
     with:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
-      extensions: ${{ needs.parse-extensions.outputs.extensions }}
+      extensions: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.parse-extensions.outputs.extensions || needs.php-version.outputs.extensions }}
+      extensions-to-build: ${{ needs.php-version.outputs.extensions }}
+      extension-build-hashes: ${{ needs.php-version.outputs.extension-build-hashes }}
       base-tag-name: build-${{ needs.php-version.outputs.build-hash }}
