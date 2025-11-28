@@ -186,7 +186,11 @@ jobs:
           echo "$extension_build_hashes" | jq -r .
           echo
 
-          echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          if [[ ${#extensions[@]} -eq 0 ]]; then
+            echo "extensions=[]" >> $GITHUB_OUTPUT
+          else
+            echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          fi
           echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
 
   check-base-images:
