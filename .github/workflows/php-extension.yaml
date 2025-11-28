@@ -193,7 +193,11 @@ jobs:
             --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
 
   tag-main-images:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      always() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.extension-version.result == 'success' &&
+      (needs.merge-extension-images.result == 'success' || needs.merge-extension-images.result == 'skipped')
     needs: [extension-version, merge-extension-images]
     runs-on: ubuntu-24.04
     steps:
