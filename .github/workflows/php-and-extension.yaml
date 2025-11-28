@@ -167,7 +167,7 @@ jobs:
             build_hash=$(sha256sum build-hash-full.json | cut -d' ' -f1)
             rm build-hash.json build-hash-full.json
 
-            extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {[$extension]: $build_hash}')"
+            extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {$extension: $build_hash}')"
 
             curl -sf --header "Authorization: Bearer $token" \
               "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
