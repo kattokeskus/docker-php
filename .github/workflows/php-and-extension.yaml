@@ -170,11 +170,11 @@ jobs:
             extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash:0:7}" '. + {$extension: $build_hash}')"
 
             curl -sf --header "Authorization: Bearer $token" \
-              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${EXTENSION}/tags/list" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/tags/list" \
               | jq -r '.tags[]' \
               | grep -q "^build-${build_hash:0:7}$" && available=1 || available=0
 
-            if [[ "$available" == "1" ]]; then
+            if [[ "$available" == "0" ]]; then
               extensions+=("$extension")
             fi
           done < <(echo "$EXTENSIONS" | jq -r '.[]')
