@@ -19,6 +19,10 @@ on:
         type: string
         description: Extensions as json array
         required: true
+      base-tag-name:
+        type: string
+        description: Base tag name
+        required: true
 
 jobs:
   build-extensions:
@@ -31,3 +35,4 @@ jobs:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
       extension: ${{ matrix.extension }}
+      base-tag-name: ${{ inputs.base-tag-name }}

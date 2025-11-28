@@ -7,9 +7,17 @@ This project provides prebuilt PHP extension images that can be installed into P
 To install a prebuilt extension into your PHP image, mount the extension image and run its install script:
 
 ```
-FROM php:8.3.27-bookworm
+ARG PHP_VERSION=8.3.27
+ARG PHP_VARIANT=bookworm
+ARG EXTENSION=calendar
+ARG EXTENSION_VERSION=${PHP_VERSION}
+FROM php:${PHP_VERSION}-${PHP_VARIANT}
+ARG PHP_VERSION
+ARG PHP_VARIANT
+ARG EXTENSION
+ARG EXTENSION_VERSION
 
-RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/calendar:8.3.27-php8.3.27-bookworm,source=/,target=/ext \
+RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT},source=/,target=/ext \
     /ext/install.sh
 ```
 
@@ -59,7 +67,6 @@ ghcr.io/kattokeskus/docker-php/ext/xdebug:8.4.14-php8.4.14-trixie
 - gmp
 - iconv
 - imagick
-- imap
 - intl
 - ldap
 - mbstring
