@@ -145,8 +145,6 @@ jobs:
               php-ext-${extension} php-ext-${extension}-test \
               > build-hash.json
 
-            cat build-hash.json
-
             # Parse context
             context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}\".context")"
             test_context="$(cat build-hash.json | jq -r ".target.\"php-ext-${extension}-test\".context")"
