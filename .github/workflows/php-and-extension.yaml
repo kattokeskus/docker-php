@@ -424,7 +424,7 @@ jobs:
           for image in "${IMAGES[@]}"
           do
             docker buildx imagetools create \
-              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}"
+              "ghcr.io/${GITHUB_REPOSITORY}/${image}:build-${BUILD_HASH}" \
               --tag "ghcr.io/${GITHUB_REPOSITORY}/${image}:${PHP_VERSION}-${PHP_VARIANT}"
 
             docker buildx imagetools create \
