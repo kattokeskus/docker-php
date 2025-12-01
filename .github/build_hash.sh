@@ -53,7 +53,7 @@ BUILD_HASH_FULL="$(echo "$PHP_BAKE" | sha256sum | cut -d' ' -f1)"
 
 BUILD_HASH="${BUILD_HASH_FULL:0:7}"
 
-if [[ -n "$EXTENSION" ]]; then
+if [[ -z "$EXTENSION" ]]; then
     echo "$BUILD_HASH"
     exit 0
 fi
