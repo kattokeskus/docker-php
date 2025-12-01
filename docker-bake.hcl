@@ -874,7 +874,7 @@ target "php-ext-vips" {
     # Vips is not a PHP module but requires FFI to be enabled
     MODULE = "FFI"
     BUILDDEPS = "meson cmake libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
-    DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 libmagickcore-6.q16-6 libmagickwand-6.q16-6 libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 libpango1.0-0 libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 libmatio11 liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 libjxl0.7 libpoppler-glib8"
+    DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 ^libmagickcore-[0-9]+.q16-[0-9]+$ ^libmagickwand-[0-9]+.q16-[0-9]+$ libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 ^libpango-?1.0-0$ libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 ^libmatio[0-9]+$ liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 ^libjxl0.[0-9]+$ libpoppler-glib8"
   }
   depends_on = ["php-ext-base", "php-ext-ffi"]
   contexts = {
