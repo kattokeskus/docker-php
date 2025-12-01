@@ -147,7 +147,7 @@ RUN --mount=type=bind,from=vips-build,source=/usr/src/vips,target=/src/vips,rw \
         && echo '  if [[ -f "../../test/test_${test}.sh" ]]; then' \
         && echo '    "../../test/test_${test}.sh" || ret=$?' \
         && echo '  else' \
-        && echo '    "./test_${test}.sh" || ret=$?' \
+        && echo '    "./test_${test}" || ret=$?' \
         && echo '  fi' \
         && echo 'done' \
         && echo 'cd /usr/src/php-vips' \
