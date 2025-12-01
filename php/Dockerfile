@@ -135,6 +135,7 @@ RUN mkdir -p /install/php-ext \
             echo '# Install dependencies' \
             && echo "DEPS=\"${DEPS}\"" \
             && echo 'ARCH="$(dpkg --print-architecture)"' \
+            && echo 'ARCH="${TARGETARCH:-$ARCH}"' \
             && echo 'deps_installed=1' \
             && echo 'for dep in $DEPS; do' \
             && echo '  if ! dpkg --get-selections | grep -e "^$dep " -e "^$dep:$ARCH " | grep -q "install$"; then' \
@@ -145,7 +146,7 @@ RUN mkdir -p /install/php-ext \
             && echo 'if [ "$deps_installed" -eq 0 ]; then' \
             && echo '  apt-get update' \
             && echo '  apt-get install -y -qq --no-install-recommends \\' \
-            && echo '    $DEPS' \
+            && echo '    $(for dep in $DEPS; do echo $dep:${ARCH}; done)' \
             && echo 'fi' \
             && echo \
         ) \

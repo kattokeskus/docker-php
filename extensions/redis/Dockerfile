@@ -51,12 +51,14 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo 'cd "$(dirname "${BASH_SOURCE[0]}")"' \
         && echo \
+        && echo 'ARCH="$(dpkg --print-architecture)"' \
+        && echo 'ARCH="${TARGETARCH:-$ARCH}"' \
         && echo '# Install dependencies' \
         && echo 'apt-get update' \
         && echo 'apt-get install -y -qq --no-install-recommends \\' \
-        && echo '    liblzf1 \\' \
-        && echo '    libzstd1 \\' \
-        && echo '    liblz4-1 \\' \
+        && echo '    liblzf1:${ARCH} \\' \
+        && echo '    libzstd1:${ARCH} \\' \
+        && echo '    liblz4-1:${ARCH}' \
         && echo \
         && echo '# Install redis extension' \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
