@@ -66,7 +66,7 @@ if [[ -z "$ext_version" ]]; then
 fi
 export $ext_version_var="$ext_version"
 
-EXTENSION_BAKE="$(EXTENSION="$EXTENSION" PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+EXTENSION_BAKE="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
     docker buildx bake --print \
     -f docker-bake.hcl \
     -f "vars.hcl" \

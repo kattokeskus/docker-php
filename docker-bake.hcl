@@ -16,6 +16,10 @@ variable "IMAP_VERSION" {
 }
 variable "REDIS_VERSION" {
 }
+variable "VIPS_VERSION" {
+}
+variable "PHP_VIPS_VERSION" {
+}
 variable "XDEBUG_VERSION" {
 }
 variable "XHPROF_VERSION" {
@@ -853,6 +857,37 @@ target "php-ext-tidy-test" {
     target = "php-ext-test"
 }
 
+target "php-ext-vips-metadata" {
+}
+target "php-ext-vips" {
+  inherits = ["php-version", "php-ext-vips-metadata"]
+  context = "extensions/vips"
+  dockerfile = "Dockerfile"
+  platforms = ["linux/amd64", "linux/arm64"]
+  args = {
+    PHP_EXT_BASE_IMAGE = "php-ext-base"
+    PHP_BASE_IMAGE = "php-base"
+    VIPS_VERSION = "${VIPS_VERSION}"
+    PHP_VIPS_VERSION = "${PHP_VIPS_VERSION}"
+    EXTENSION = "vips"
+    EXTENSION_SCRATCH_IMAGE = "php-ext-ffi"
+    # Vips is not a PHP module but requires FFI to be enabled
+    MODULE = "FFI"
+    BUILDDEPS = "meson cmake qemu-user-static libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
+    DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 ^libmagickcore-[0-9]+.q16-[0-9]+$ ^libmagickwand-[0-9]+.q16-[0-9]+$ libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 ^libpango-?1.0-0$ libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 ^libmatio[0-9]+$ liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 ^libjxl0.[0-9]+$ libpoppler-glib8"
+  }
+  depends_on = ["php-ext-base", "php-ext-ffi"]
+  contexts = {
+    php-ext-base = "target:php-ext-base"
+    php-base = "target:php-base"
+    php-ext-ffi = "target:php-ext-ffi"
+  }
+}
+target "php-ext-vips-test" {
+    inherits = ["php-ext-vips"]
+    target = "test"
+}
+
 target "php-ext-xdebug-metadata" {
 }
 target "php-ext-xdebug" {
@@ -1029,6 +1064,7 @@ group "extensions" {
     "php-ext-sysvsem",
     "php-ext-sysvshm",
     "php-ext-tidy",
+    "php-ext-vips",
     "php-ext-xdebug",
     "php-ext-xhprof",
     //"php-ext-xml",
@@ -1092,6 +1128,7 @@ group "extensions-test" {
     "php-ext-sysvsem-test",
     "php-ext-sysvshm-test",
     "php-ext-tidy-test",
+    "php-ext-vips-test",
     "php-ext-xdebug-test",
     "php-ext-xhprof-test",
     //"php-ext-xml-test",
@@ -1122,35 +1159,36 @@ target "php-base" {
 /*  5. dba                       */
 /*  6. enchant                   */
 /*  7. exif                      */
-/*  8. ffi                       */
-/*  9. pcntl                     */
-/* 10. ftp                       */
-/* 11. gd                        */
-/* 12. gettext                   */
-/* 13. gmp                       */
-/* 14. imagick                   */
-/* 15. intl                      */
-/* 16. ldap                      */
-/* 17. mysqli                    */
-/* 18. pdo_dblib                 */
-/* 19. sockets                   */
-/* 20. pdo_firebird              */
-/* 21. pdo_mysql                 */
-/* 22. pdo_odbc                  */
-/* 23. pdo_pgsql                 */
-/* 24. pgsql                     */
-/* 25. redis                     */
-/* 26. shmop                     */
-/* 27. snmp                      */
-/* 28. soap                      */
-/* 29. sysvmsg                   */
-/* 30. sysvsem                   */
-/* 31. sysvshm                   */
-/* 32. tidy                      */
-/* 33. xhprof                    */
-/* 34. xsl                       */
-/* 35. zip                       */
-/* 36. xdebug                    */
+/*  8. pcntl                     */
+/*  9. ftp                       */
+/* 10. gd                        */
+/* 11. gettext                   */
+/* 12. gmp                       */
+/* 13. imagick                   */
+/* 14. intl                      */
+/* 15. ldap                      */
+/* 16. mysqli                    */
+/* 17. pdo_dblib                 */
+/* 18. sockets                   */
+/* 19. pdo_firebird              */
+/* 20. pdo_mysql                 */
+/* 21. pdo_odbc                  */
+/* 22. pdo_pgsql                 */
+/* 23. pgsql                     */
+/* 24. redis                     */
+/* 25. shmop                     */
+/* 26. snmp                      */
+/* 27. soap                      */
+/* 28. sysvmsg                   */
+/* 29. sysvsem                   */
+/* 30. sysvshm                   */
+/* 31. tidy                      */
+/* 32. ffi                       */
+/* 33. vips                      */
+/* 34. xhprof                    */
+/* 35. xsl                       */
+/* 36. zip                       */
+/* 37. xdebug                    */
 /*********************************/
 target "php-intermediate-base" {
     inherits = ["php-version"]
@@ -1251,30 +1289,17 @@ target "php-intermediate-exif" {
     depends_on = ["php-intermediate-enchant", "php-ext-exif"]
 }
 
-target "php-intermediate-ffi" {
-    inherits = ["php-intermediate-base"]
-    contexts = {
-        php-intermediate-exif = "target:php-intermediate-exif"
-        php-ext-ffi = "target:php-ext-ffi"
-    }
-    args = {
-        PHP_BASE_IMAGE = "php-intermediate-exif"
-        EXTENSION_IMAGE = "php-ext-ffi"
-    }
-    depends_on = ["php-intermediate-exif", "php-ext-ffi"]
-}
-
 target "php-intermediate-ftp" {
     inherits = ["php-intermediate-base"]
     contexts = {
-        php-intermediate-ffi = "target:php-intermediate-ffi"
+        php-intermediate-exif = "target:php-intermediate-exif"
         php-ext-ftp = "target:php-ext-ftp"
     }
     args = {
-        PHP_BASE_IMAGE = "php-intermediate-ffi"
+        PHP_BASE_IMAGE = "php-intermediate-exif"
         EXTENSION_IMAGE = "php-ext-ftp"
     }
-    depends_on = ["php-intermediate-ffi", "php-ext-ftp"]
+    depends_on = ["php-intermediate-exif", "php-ext-ftp"]
 }
 
 target "php-intermediate-gd" {
@@ -1578,17 +1603,30 @@ target "php-intermediate-tidy" {
     depends_on = ["php-intermediate-sysvshm", "php-ext-tidy"]
 }
 
-target "php-intermediate-xhprof" {
+target "php-intermediate-vips" {
     inherits = ["php-intermediate-base"]
     contexts = {
         php-intermediate-tidy = "target:php-intermediate-tidy"
-        php-ext-xhprof = "target:php-ext-xhprof"
+        php-ext-vips = "target:php-ext-vips"
     }
     args = {
         PHP_BASE_IMAGE = "php-intermediate-tidy"
+        EXTENSION_IMAGE = "php-ext-vips"
+    }
+    depends_on = ["php-intermediate-tidy", "php-ext-vips"]
+}
+
+target "php-intermediate-xhprof" {
+    inherits = ["php-intermediate-base"]
+    contexts = {
+        php-intermediate-vips = "target:php-intermediate-vips"
+        php-ext-xhprof = "target:php-ext-xhprof"
+    }
+    args = {
+        PHP_BASE_IMAGE = "php-intermediate-vips"
         EXTENSION_IMAGE = "php-ext-xhprof"
     }
-    depends_on = ["php-intermediate-tidy", "php-ext-xhprof"]
+    depends_on = ["php-intermediate-vips", "php-ext-xhprof"]
 }
 
 target "php-intermediate-xsl" {

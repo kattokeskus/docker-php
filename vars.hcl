@@ -18,6 +18,14 @@ variable "REDIS_VERSION" {
     # renovate: datasource=custom.pecl depName=redis versioning=semver
     default = "6.3.0"
 }
+variable "VIPS_VERSION" {
+    # renovate: datasource=github-releases depName=libvips/libvips versioning=semver
+    default = "8.17.3"
+}
+variable "PHP_VIPS_VERSION" {
+    # renovate: datasource=github-releases depName=libvips/php-vips versioning=semver
+    default = "2.5.0"
+}
 variable "XDEBUG_VERSION" {
     # renovate: datasource=custom.pecl depName=xdebug versioning=semver
     default = "3.4.7"
