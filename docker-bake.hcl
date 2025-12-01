@@ -59,7 +59,7 @@ target "php-ext-metadata" {
 }
 target "php-ext" {
   inherits = ["php-version", "php-ext-metadata"]
-  context = "php"
+  context = "extensions/base"
   platforms = ["linux/amd64", "linux/arm64"]
   args = {
     PHP_BASE_IMAGE = "php-base"
