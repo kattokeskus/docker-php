@@ -8,7 +8,7 @@ variable "IMAGEMAGICK_VERSION" {
 }
 variable "IMAGICK_VERSION" {
     # renovate: datasource=custom.pecl depName=imagick versioning=semver
-    default = "3.8.0"
+    default = "3.8.1"
 }
 variable "IMAP_VERSION" {
     # renovate: datasource=custom.pecl depName=imap versioning=semver
