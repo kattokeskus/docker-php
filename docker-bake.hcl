@@ -16,6 +16,10 @@ variable "IMAP_VERSION" {
 }
 variable "REDIS_VERSION" {
 }
+variable "VIPS_VERSION" {
+}
+variable "PHP_VIPS_VERSION" {
+}
 variable "XDEBUG_VERSION" {
 }
 variable "XHPROF_VERSION" {
@@ -853,6 +857,37 @@ target "php-ext-tidy-test" {
     target = "php-ext-test"
 }
 
+target "php-ext-vips-metadata" {
+}
+target "php-ext-vips" {
+  inherits = ["php-version", "php-ext-vips-metadata"]
+  context = "extensions/vips"
+  dockerfile = "Dockerfile"
+  platforms = ["linux/amd64", "linux/arm64"]
+  args = {
+    PHP_EXT_BASE_IMAGE = "php-ext-base"
+    PHP_BASE_IMAGE = "php-base"
+    VIPS_VERSION = "${VIPS_VERSION}"
+    PHP_VIPS_VERSION = "${PHP_VIPS_VERSION}"
+    EXTENSION = "vips"
+    EXTENSION_SCRATCH_IMAGE = "php-ext-ffi"
+    # Vips is not a PHP module but requires FFI to be enabled
+    MODULE = "FFI"
+    BUILDDEPS = "meson cmake libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
+    DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 libmagickcore-6.q16-6 libmagickwand-6.q16-6 libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 libpango1.0-0 libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 libmatio11 liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 libjxl0.7 libpoppler-glib8"
+  }
+  depends_on = ["php-ext-base", "php-ext-ffi"]
+  contexts = {
+    php-ext-base = "target:php-ext-base"
+    php-base = "target:php-base"
+    php-ext-ffi = "target:php-ext-ffi"
+  }
+}
+target "php-ext-vips-test" {
+    inherits = ["php-ext-vips"]
+    target = "test"
+}
+
 target "php-ext-xdebug-metadata" {
 }
 target "php-ext-xdebug" {
@@ -1029,6 +1064,7 @@ group "extensions" {
     "php-ext-sysvsem",
     "php-ext-sysvshm",
     "php-ext-tidy",
+    "php-ext-vips",
     "php-ext-xdebug",
     "php-ext-xhprof",
     //"php-ext-xml",
@@ -1092,6 +1128,7 @@ group "extensions-test" {
     "php-ext-sysvsem-test",
     "php-ext-sysvshm-test",
     "php-ext-tidy-test",
+    "php-ext-vips-test",
     "php-ext-xdebug-test",
     "php-ext-xhprof-test",
     //"php-ext-xml-test",
@@ -1578,17 +1615,30 @@ target "php-intermediate-tidy" {
     depends_on = ["php-intermediate-sysvshm", "php-ext-tidy"]
 }
 
-target "php-intermediate-xhprof" {
+target "php-intermediate-vips" {
     inherits = ["php-intermediate-base"]
     contexts = {
         php-intermediate-tidy = "target:php-intermediate-tidy"
-        php-ext-xhprof = "target:php-ext-xhprof"
+        php-ext-vips = "target:php-ext-vips"
     }
     args = {
         PHP_BASE_IMAGE = "php-intermediate-tidy"
+        EXTENSION_IMAGE = "php-ext-vips"
+    }
+    depends_on = ["php-intermediate-tidy", "php-ext-vips"]
+}
+
+target "php-intermediate-xhprof" {
+    inherits = ["php-intermediate-base"]
+    contexts = {
+        php-intermediate-vips = "target:php-intermediate-vips"
+        php-ext-xhprof = "target:php-ext-xhprof"
+    }
+    args = {
+        PHP_BASE_IMAGE = "php-intermediate-vips"
         EXTENSION_IMAGE = "php-ext-xhprof"
     }
-    depends_on = ["php-intermediate-tidy", "php-ext-xhprof"]
+    depends_on = ["php-intermediate-vips", "php-ext-xhprof"]
 }
 
 target "php-intermediate-xsl" {
