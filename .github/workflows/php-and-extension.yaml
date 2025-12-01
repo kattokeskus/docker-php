@@ -179,6 +179,11 @@ jobs:
           else
             echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
           fi
+          if [[ ${#extensions_without_tags[@]} -eq 0 ]]; then
+            echo "extensions-without-tags=[]" >> $GITHUB_OUTPUT
+          else
+            echo "extensions-without-tags=[$(echo ${extensions_without_tags[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          fi
           echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
 
   build-base-images:
