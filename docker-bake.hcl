@@ -873,7 +873,7 @@ target "php-ext-vips" {
     EXTENSION_SCRATCH_IMAGE = "php-ext-ffi"
     # Vips is not a PHP module but requires FFI to be enabled
     MODULE = "FFI"
-    BUILDDEPS = "meson cmake libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
+    BUILDDEPS = "meson cmake qemu-user-static libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
     DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 ^libmagickcore-[0-9]+.q16-[0-9]+$ ^libmagickwand-[0-9]+.q16-[0-9]+$ libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 ^libpango-?1.0-0$ libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 ^libmatio[0-9]+$ liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 ^libjxl0.[0-9]+$ libpoppler-glib8"
   }
   depends_on = ["php-ext-base", "php-ext-ffi"]
@@ -1159,35 +1159,36 @@ target "php-base" {
 /*  5. dba                       */
 /*  6. enchant                   */
 /*  7. exif                      */
-/*  8. ffi                       */
-/*  9. pcntl                     */
-/* 10. ftp                       */
-/* 11. gd                        */
-/* 12. gettext                   */
-/* 13. gmp                       */
-/* 14. imagick                   */
-/* 15. intl                      */
-/* 16. ldap                      */
-/* 17. mysqli                    */
-/* 18. pdo_dblib                 */
-/* 19. sockets                   */
-/* 20. pdo_firebird              */
-/* 21. pdo_mysql                 */
-/* 22. pdo_odbc                  */
-/* 23. pdo_pgsql                 */
-/* 24. pgsql                     */
-/* 25. redis                     */
-/* 26. shmop                     */
-/* 27. snmp                      */
-/* 28. soap                      */
-/* 29. sysvmsg                   */
-/* 30. sysvsem                   */
-/* 31. sysvshm                   */
-/* 32. tidy                      */
-/* 33. xhprof                    */
-/* 34. xsl                       */
-/* 35. zip                       */
-/* 36. xdebug                    */
+/*  8. pcntl                     */
+/*  9. ftp                       */
+/* 10. gd                        */
+/* 11. gettext                   */
+/* 12. gmp                       */
+/* 13. imagick                   */
+/* 14. intl                      */
+/* 15. ldap                      */
+/* 16. mysqli                    */
+/* 17. pdo_dblib                 */
+/* 18. sockets                   */
+/* 19. pdo_firebird              */
+/* 20. pdo_mysql                 */
+/* 21. pdo_odbc                  */
+/* 22. pdo_pgsql                 */
+/* 23. pgsql                     */
+/* 24. redis                     */
+/* 25. shmop                     */
+/* 26. snmp                      */
+/* 27. soap                      */
+/* 28. sysvmsg                   */
+/* 29. sysvsem                   */
+/* 30. sysvshm                   */
+/* 31. tidy                      */
+/* 32. ffi                       */
+/* 33. vips                      */
+/* 34. xhprof                    */
+/* 35. xsl                       */
+/* 36. zip                       */
+/* 37. xdebug                    */
 /*********************************/
 target "php-intermediate-base" {
     inherits = ["php-version"]
@@ -1288,30 +1289,17 @@ target "php-intermediate-exif" {
     depends_on = ["php-intermediate-enchant", "php-ext-exif"]
 }
 
-target "php-intermediate-ffi" {
-    inherits = ["php-intermediate-base"]
-    contexts = {
-        php-intermediate-exif = "target:php-intermediate-exif"
-        php-ext-ffi = "target:php-ext-ffi"
-    }
-    args = {
-        PHP_BASE_IMAGE = "php-intermediate-exif"
-        EXTENSION_IMAGE = "php-ext-ffi"
-    }
-    depends_on = ["php-intermediate-exif", "php-ext-ffi"]
-}
-
 target "php-intermediate-ftp" {
     inherits = ["php-intermediate-base"]
     contexts = {
-        php-intermediate-ffi = "target:php-intermediate-ffi"
+        php-intermediate-exif = "target:php-intermediate-exif"
         php-ext-ftp = "target:php-ext-ftp"
     }
     args = {
-        PHP_BASE_IMAGE = "php-intermediate-ffi"
+        PHP_BASE_IMAGE = "php-intermediate-exif"
         EXTENSION_IMAGE = "php-ext-ftp"
     }
-    depends_on = ["php-intermediate-ffi", "php-ext-ftp"]
+    depends_on = ["php-intermediate-exif", "php-ext-ftp"]
 }
 
 target "php-intermediate-gd" {
