@@ -94,22 +94,29 @@ jobs:
           echo "build-hash=${build_hash}" >> $GITHUB_OUTPUT
 
           # Check if base images are already built
-          curl -sfL \
+          headers="$(curl -sIL \
             -H "Authorization: Bearer $REGISTRY_TOKEN" \
             -H "Accept: application/vnd.oci.image.index.v1+json" \
             "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/build-${build_hash}" \
-            > /dev/null 2>&1 && available=1 || available=0
+            2>/dev/null)"
+          echo "$headers" | head -n1 | grep '^HTTP/' | grep -q 200 && available=1 || available=0
+          digest=$(echo "$headers" | grep -i '^docker-content-digest:' | cut -d' ' -f2- | tr -d ' ' || true)
 
           echo "available=${available}" >> $GITHUB_OUTPUT
 
-          # Check if final tag is already pushed
-          curl -sfL \
-            -H "Authorization: Bearer $REGISTRY_TOKEN" \
-            -H "Accept: application/vnd.oci.image.index.v1+json" \
-            "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/${PHP_VERSION}-${PHP_VARIANT}" \
-            > /dev/null 2>&1 && tag_available=1 || tag_available=0
+          if [[ "$available" == "0" ]]; then
+            echo "tag-available=0" >> $GITHUB_OUTPUT
+          else
+            # Check if final tag is already pushed
+            curl -sIfL \
+              -H "Authorization: Bearer $REGISTRY_TOKEN" \
+              -H "Accept: application/vnd.oci.image.index.v1+json" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/${PHP_VERSION}-${PHP_VARIANT}" \
+              | grep -i '^docker-content-digest:' | grep -iq "$digest" \
+              > /dev/null 2>&1 && tag_available=1 || tag_available=0)
 
-          echo "tag-available=${tag_available}" >> $GITHUB_OUTPUT
+            echo "tag-available=${tag_available}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Get extensions to build
         id: extensions
@@ -142,21 +149,27 @@ jobs:
             extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash}" '. + {$extension: $build_hash}')"
 
             # Check if extension image is already built
-            curl -sfL \
+            headers="$(curl -sIL \
               -H "Authorization: Bearer $REGISTRY_TOKEN" \
               -H "Accept: application/vnd.oci.image.index.v1+json" \
-              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/build-${build_hash:0:7}" \
-              > /dev/null 2>&1 && available=1 || available=0
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/build-${build_hash}" \
+              2>/dev/null)"
+            echo "$headers" | head -n1 | grep '^HTTP/' | grep -q 200 && available=1 || available=0
 
             if [[ "$available" == "0" ]]; then
               extensions+=("$extension")
+              extensions_without_tags+=("$extension")
+              continue
             fi
+
+            digest=$(echo "$headers" | grep -i '^docker-content-digest:' | cut -d' ' -f2- | tr -d ' ' || true)
 
             # Check if extension final tag is already pushed
             curl -sfL \
               -H "Authorization: Bearer $REGISTRY_TOKEN" \
               -H "Accept: application/vnd.oci.image.index.v1+json" \
               "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/${ext_version}-php${PHP_VERSION}-${PHP_VARIANT}" \
+              | grep -i '^docker-content-digest:' | grep -iq "$digest" \
               > /dev/null 2>&1 && tag_available=1 || tag_available=0
 
             if [[ "$tag_available" == "0" ]]; then
