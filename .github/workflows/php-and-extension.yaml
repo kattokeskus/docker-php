@@ -167,6 +167,9 @@ jobs:
           echo "extensions:"
           echo "${extensions[@]}" | tr ' ' '\n'
           echo
+          echo "extensions-without-tags:"
+          echo "${extensions_without_tags[@]}" | tr ' ' '\n'
+          echo
           echo "extension-build-hashes:"
           echo "$extension_build_hashes" | jq -r .
           echo
