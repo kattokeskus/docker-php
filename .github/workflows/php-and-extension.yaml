@@ -113,7 +113,7 @@ jobs:
               -H "Accept: application/vnd.oci.image.index.v1+json" \
               "https://ghcr.io/v2/${GITHUB_REPOSITORY}/php-base/manifests/${PHP_VERSION}-${PHP_VARIANT}" \
               | grep -i '^docker-content-digest:' | grep -iq "$digest" \
-              > /dev/null 2>&1 && tag_available=1 || tag_available=0)
+              > /dev/null 2>&1 && tag_available=1 || tag_available=0
 
             echo "tag-available=${tag_available}" >> $GITHUB_OUTPUT
           fi
