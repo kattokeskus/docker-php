@@ -38,10 +38,12 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo 'cd "$(dirname "${BASH_SOURCE[0]}")"' \
         && echo \
+        && echo 'ARCH="$(dpkg --print-architecture)"' \
+        && echo 'ARCH="${TARGETARCH:-$ARCH}"' \
         && echo '# Install dependencies' \
         && echo 'apt-get update' \
         && echo 'apt-get install -y -qq --no-install-recommends \\' \
-        && echo '    gettext \\' \
+        && echo '    gettext:${ARCH} \\' \
         && echo '    locales' \
         && echo \
         && echo '# Reconfigure locales' \
