@@ -20,7 +20,7 @@ variable "REDIS_VERSION" {
 }
 variable "VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/libvips versioning=semver
-    default = "8.17.3"
+    default = "8.18.0"
 }
 variable "PHP_VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/php-vips versioning=semver
