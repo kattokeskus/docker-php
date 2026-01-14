@@ -1,6 +1,6 @@
 variable "APCU_VERSION" {
     # renovate: datasource=custom.pecl depName=apcu versioning=semver
-    default = "5.1.27"
+    default = "5.1.28"
 }
 variable "IMAGEMAGICK_VERSION" {
     # renovate: datasource=github-release depName=ImageMagick/ImageMagick versioning=semver
