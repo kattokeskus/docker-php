@@ -28,7 +28,7 @@ variable "PHP_VIPS_VERSION" {
 }
 variable "XDEBUG_VERSION" {
     # renovate: datasource=custom.pecl depName=xdebug versioning=semver
-    default = "3.4.7"
+    default = "3.5.0"
 }
 variable "XHPROF_VERSION" {
     # renovate: datasource=custom.pecl depName=xhprof versioning=semver
