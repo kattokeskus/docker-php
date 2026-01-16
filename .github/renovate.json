@@ -45,6 +45,20 @@
             "allowedVersions": "<8.5.0"
         },
         {
+            "matchFileNames": [
+                "vars-8.5.hcl"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
+            "matchPackageNames": [
+                "php",
+                "library/php",
+                "docker.io/library/php"
+            ],
+            "allowedVersions": "<8.6.0"
+        },
+        {
             "description": "pecl version extractor",
             "matchDatasources": [
                 "custom.pecl"
