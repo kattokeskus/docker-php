@@ -2,15 +2,22 @@
 
 This project provides prebuilt PHP extension images that can be installed into PHP base images.
 
+## Table of Contents
+
+- [Using Prebuilt Extensions](#using-prebuilt-extensions)
+- [Tag Format](#tag-format)
+- [Supported PHP Versions](#supported-php-versions)
+- [Available Extensions](#available-extensions)
+
 ## Using Prebuilt Extensions
 
 To install a prebuilt extension into your PHP image, mount the extension image and run its install script:
 
-```
-ARG PHP_VERSION=8.3.27
+```dockerfile
+ARG PHP_VERSION=8.4.17
 ARG PHP_VARIANT=bookworm
-ARG EXTENSION=calendar
-ARG EXTENSION_VERSION=${PHP_VERSION}
+ARG EXTENSION=redis
+ARG EXTENSION_VERSION=6.3.0
 FROM php:${PHP_VERSION}-${PHP_VARIANT}
 ARG PHP_VERSION
 ARG PHP_VARIANT
@@ -20,6 +27,8 @@ ARG EXTENSION_VERSION
 RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT},source=/,target=/ext \
     /ext/install.sh
 ```
+
+> **Note:** Check [vars-8.3.hcl](vars-8.3.hcl), [vars-8.4.hcl](vars-8.4.hcl), or [vars-8.5.hcl](vars-8.5.hcl) for exact PHP versions as they are updated by Renovate.
 
 ## Tag Format
 
@@ -31,20 +40,21 @@ ghcr.io/kattokeskus/docker-php/ext/<extension>:<version>-php<php-version>-<varia
 
 Where:
 - `<extension>` is the extension name (e.g., `redis`, `xdebug`)
-- `<version>` is the extension versino (e.g. `6.3.0`, `8.4.14`)
-- `<php-version>` is the PHP version (e.g., `8.3.27`, `8.4.14`)
+- `<version>` is the extension version (e.g., `6.3.0`, `3.5.0`)
+- `<php-version>` is the PHP version (e.g., `8.4.17`, `8.5.1`)
 - `<variant>` is the PHP image variant (e.g., `bookworm`, `trixie`)
 
 Example:
 ```
-ghcr.io/kattokeskus/docker-php/ext/redis:6.3.0-php8.3.27-bookworm
-ghcr.io/kattokeskus/docker-php/ext/xdebug:8.4.14-php8.4.14-trixie
+ghcr.io/kattokeskus/docker-php/ext/redis:6.3.0-php8.4.17-bookworm
+ghcr.io/kattokeskus/docker-php/ext/xdebug:3.5.0-php8.5.1-trixie
 ```
 
 ## Supported PHP Versions
 
 - PHP 8.3
 - PHP 8.4
+- PHP 8.5
 
 ## Available Extensions
 
@@ -52,26 +62,18 @@ ghcr.io/kattokeskus/docker-php/ext/xdebug:8.4.14-php8.4.14-trixie
 - bcmath
 - bz2
 - calendar
-- curl
-- ctype
 - dba
-- dom
 - enchant
 - exif
 - ffi
-- fileinfo
-- filter
 - ftp
 - gd
 - gettext
 - gmp
-- iconv
 - imagick
 - intl
 - ldap
-- mbstring
 - mysqli
-- opcache
 - pcntl
 - pdo
 - pdo_dblib
@@ -79,13 +81,10 @@ ghcr.io/kattokeskus/docker-php/ext/xdebug:8.4.14-php8.4.14-trixie
 - pdo_mysql
 - pdo_odbc
 - pdo_pgsql
+- pdo_sqlite
 - pgsql
-- phar
-- posix
 - redis
-- session
 - shmop
-- simplexml
 - snmp
 - soap
 - sockets
@@ -93,10 +92,8 @@ ghcr.io/kattokeskus/docker-php/ext/xdebug:8.4.14-php8.4.14-trixie
 - sysvsem
 - sysvshm
 - tidy
+- vips
 - xdebug
 - xhprof
-- xml
-- xmlreader
-- xmlwriter
 - xsl
 - zip
