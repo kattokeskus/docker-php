@@ -8,6 +8,7 @@
         "dependencyDashboardApproval": true
     },
     "enabledManagers": [
+        "github-actions",
         "custom.regex"
     ],
     "prHourlyLimit": 0,
