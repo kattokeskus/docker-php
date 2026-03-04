@@ -62,6 +62,7 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo '# Install redis extension' \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
+        && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable redis' \
         && echo 'php -m | grep -q "^redis$"' \
     ) > /install/install.sh \

@@ -42,6 +42,7 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo '# Install xdebug extension' \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
+        && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable xdebug' \
         && echo 'php -m | grep -q "^xdebug$"' \
     ) > /install/install.sh \

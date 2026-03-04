@@ -92,6 +92,7 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo "# Install ${EXTENSION} extension" \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
+        && echo 'cp -rP usr/* /usr/' \
         && echo "docker-php-ext-enable ${EXTENSION}" \
         && echo 'FOUND_MODULE=$(php -m | grep '"'^$MODULE"'$'"' | head -n1)" \
         && echo '[ "$FOUND_MODULE" = "'"$MODULE"'" ] || ( \\' \

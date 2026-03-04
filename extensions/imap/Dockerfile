@@ -58,6 +58,7 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo '# Install imap extension' \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
+        && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable imap' \
         && echo 'php -m | grep -q "^imap$"' \
     ) > /install/install.sh \
