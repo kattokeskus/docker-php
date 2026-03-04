@@ -26,6 +26,10 @@ variable "PHP_VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/php-vips versioning=semver
     default = "2.5.0"
 }
+variable "SPX_VERSION" {
+    # renovate: datasource=github-releases depName=NoiseByNorthwest/php-spx versioning=semver
+    default = "0.4.22"
+}
 variable "XDEBUG_VERSION" {
     # renovate: datasource=custom.pecl depName=xdebug versioning=semver
     default = "3.5.0"

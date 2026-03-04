@@ -20,6 +20,8 @@ variable "VIPS_VERSION" {
 }
 variable "PHP_VIPS_VERSION" {
 }
+variable "SPX_VERSION" {
+}
 variable "XDEBUG_VERSION" {
 }
 variable "XHPROF_VERSION" {
@@ -775,6 +777,29 @@ target "php-ext-soap-test" {
     target = "php-ext-test"
 }
 
+target "php-ext-spx-metadata" {
+}
+target "php-ext-spx" {
+  inherits = ["php-version", "php-ext-spx-metadata"]
+  context = "extensions/spx"
+  dockerfile = "Dockerfile"
+  platforms = ["linux/amd64", "linux/arm64"]
+  args = {
+    PHP_EXT_BASE_IMAGE = "php-ext-base"
+    PHP_BASE_IMAGE = "php-base"
+    SPX_VERSION = "${SPX_VERSION}"
+  }
+  depends_on = ["php-ext-base"]
+  contexts = {
+    php-ext-base = "target:php-ext-base"
+    php-base = "target:php-base"
+  }
+}
+target "php-ext-spx-test" {
+    inherits = ["php-ext-spx"]
+    target = "test"
+}
+
 target "php-ext-sockets-metadata" {
 }
 target "php-ext-sockets" {
@@ -1059,6 +1084,7 @@ group "extensions" {
     "php-ext-snmp",
     "php-ext-soap",
     "php-ext-sockets",
+    "php-ext-spx",
     //"php-ext-sodium",
     "php-ext-sysvmsg",
     "php-ext-sysvsem",
@@ -1123,6 +1149,7 @@ group "extensions-test" {
     "php-ext-snmp-test",
     "php-ext-soap-test",
     "php-ext-sockets-test",
+    "php-ext-spx-test",
     //"php-ext-sodium-test",
     "php-ext-sysvmsg-test",
     "php-ext-sysvsem-test",
@@ -1188,7 +1215,8 @@ target "php-base" {
 /* 34. xhprof                    */
 /* 35. xsl                       */
 /* 36. zip                       */
-/* 37. xdebug                    */
+/* 37. spx                       */
+/* 38. xdebug                    */
 /*********************************/
 target "php-intermediate-base" {
     inherits = ["php-version"]
@@ -1655,17 +1683,30 @@ target "php-intermediate-zip" {
     depends_on = ["php-intermediate-xsl", "php-ext-zip"]
 }
 
-target "php-intermediate-xdebug" {
+target "php-intermediate-spx" {
     inherits = ["php-intermediate-base"]
     contexts = {
         php-intermediate-zip = "target:php-intermediate-zip"
-        php-ext-xdebug = "target:php-ext-xdebug"
+        php-ext-spx = "target:php-ext-spx"
     }
     args = {
         PHP_BASE_IMAGE = "php-intermediate-zip"
+        EXTENSION_IMAGE = "php-ext-spx"
+    }
+    depends_on = ["php-intermediate-zip", "php-ext-spx"]
+}
+
+target "php-intermediate-xdebug" {
+    inherits = ["php-intermediate-base"]
+    contexts = {
+        php-intermediate-spx = "target:php-intermediate-spx"
+        php-ext-xdebug = "target:php-ext-xdebug"
+    }
+    args = {
+        PHP_BASE_IMAGE = "php-intermediate-spx"
         EXTENSION_IMAGE = "php-ext-xdebug"
     }
-    depends_on = ["php-intermediate-zip", "php-ext-xdebug"]
+    depends_on = ["php-intermediate-spx", "php-ext-xdebug"]
 }
 
 /********************************/
@@ -1682,12 +1723,12 @@ target "php" {
     target = "dummy"
     platforms = ["linux/amd64", "linux/arm64"]
     contexts = {
-        php-intermediate-zip = "target:php-intermediate-zip"
+        php-intermediate-spx = "target:php-intermediate-spx"
     }
     args = {
-        IMAGE = "php-intermediate-zip"
+        IMAGE = "php-intermediate-spx"
     }
-    depends_on = ["php-intermediate-zip"]
+    depends_on = ["php-intermediate-spx"]
 }
 
 target "php-debug-metadata" {
