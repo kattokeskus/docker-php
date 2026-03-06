@@ -58,6 +58,7 @@ RUN mkdir -p /install/php-ext \
         && echo \
         && echo '# Install gettext extension' \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
+        && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable gettext' \
         && echo 'php -m | grep -q "^gettext$"' \
     ) > /install/install.sh \
