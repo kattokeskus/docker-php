@@ -329,12 +329,12 @@ jobs:
             .github/oci_merge_archives.sh
           sparse-checkout-cone-mode: false
       - name: Download php-base artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
           merge-multiple: true
       - name: Download php-ext-base artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
           merge-multiple: true
