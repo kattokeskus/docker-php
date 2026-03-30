@@ -93,7 +93,7 @@ jobs:
             org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           bake-target: php-ext-${{ inputs.extension }}-metadata
       - name: Login to Github Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -154,7 +154,7 @@ jobs:
           pattern: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-*
           merge-multiple: true
       - name: Login to Github Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -202,7 +202,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Login to Github Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
