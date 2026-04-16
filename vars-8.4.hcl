@@ -1,6 +1,6 @@
 variable "PHP_VERSION" {
     # renovate: datasource=docker depName=docker.io/library/php versioning=semver
-    default = "8.4.19"
+    default = "8.4.20"
 }
 variable "PHP_VARIANT" {
     default = "bookworm"
