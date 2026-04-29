@@ -18,6 +18,8 @@ variable "REDIS_VERSION" {
 }
 variable "VIPS_VERSION" {
 }
+variable "VIPS_PREVIOUS_VERSION" {
+}
 variable "PHP_VIPS_VERSION" {
 }
 variable "SPX_VERSION" {
@@ -913,6 +915,38 @@ target "php-ext-vips-test" {
     target = "test"
 }
 
+
+target "php-ext-vips-previous-metadata" {
+}
+target "php-ext-vips-previous" {
+  inherits = ["php-version", "php-ext-vips-previous-metadata"]
+  context = "extensions/vips"
+  dockerfile = "Dockerfile"
+  platforms = ["linux/amd64", "linux/arm64"]
+  args = {
+    PHP_EXT_BASE_IMAGE = "php-ext-base"
+    PHP_BASE_IMAGE = "php-base"
+    VIPS_VERSION = "${VIPS_PREVIOUS_VERSION}"
+    PHP_VIPS_VERSION = "${PHP_VIPS_VERSION}"
+    EXTENSION = "vips"
+    EXTENSION_SCRATCH_IMAGE = "php-ext-ffi"
+    # Vips is not a PHP module but requires FFI to be enabled
+    MODULE = "FFI"
+    BUILDDEPS = "meson cmake qemu-user-static libglib2.0-dev libexpat1-dev libjemalloc-dev libarchive-dev libfftw3-dev libmagickcore-dev libmagickwand-dev libcfitsio-dev libimagequant-dev libcgif-dev libjpeg-dev libexif-dev libspng-dev libwebp-dev libpango1.0-dev librsvg2-2 libfontconfig-dev libopenslide-dev libmatio-dev liblcms2-dev libopenexr-dev libopenjp2-7-dev libhwy-dev liborc-0.4-dev libheif-dev libjxl-dev libpoppler-glib-dev bc"
+    DEPS = "libglib2.0-0 libexpat1 libjemalloc2 libarchive13 libfftw3-double3 ^libmagickcore-[0-9]+.q16-[0-9]+$ ^libmagickwand-[0-9]+.q16-[0-9]+$ libcfitsio10 libimagequant0 libcgif0 libjpeg62 libexif12 libspng0 libwebp7 ^libpango-?1.0-0$ libpangocairo-1.0-0 librsvg2-dev libfontconfig1 libopenslide0 ^libmatio[0-9]+$ liblcms2-2 libopenexr-3-1-30 libhwy1 liborc-0.4-0 libheif1 ^libjxl0.[0-9]+$ libpoppler-glib8"
+  }
+  depends_on = ["php-ext-base", "php-ext-ffi"]
+  contexts = {
+    php-ext-base = "target:php-ext-base"
+    php-base = "target:php-base"
+    php-ext-ffi = "target:php-ext-ffi"
+  }
+}
+target "php-ext-vips-previous-test" {
+    inherits = ["php-ext-vips-previous"]
+    target = "test"
+}
+
 target "php-ext-xdebug-metadata" {
 }
 target "php-ext-xdebug" {
@@ -1091,6 +1125,7 @@ group "extensions" {
     "php-ext-sysvshm",
     "php-ext-tidy",
     "php-ext-vips",
+    "php-ext-vips-previous",
     "php-ext-xdebug",
     "php-ext-xhprof",
     //"php-ext-xml",
@@ -1156,6 +1191,7 @@ group "extensions-test" {
     "php-ext-sysvshm-test",
     "php-ext-tidy-test",
     "php-ext-vips-test",
+    "php-ext-vips-previous-test",
     "php-ext-xdebug-test",
     "php-ext-xhprof-test",
     //"php-ext-xml-test",

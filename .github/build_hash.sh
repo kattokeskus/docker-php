@@ -58,7 +58,7 @@ if [[ -z "$EXTENSION" ]]; then
     exit 0
 fi
 
-ext_version_var=$(echo "$EXTENSION" | tr '[:lower:]' '[:upper:]')_VERSION
+ext_version_var=$(echo "$EXTENSION" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
 ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
 if [[ -z "$ext_version" ]]; then
     ext_version_var="PHP_VERSION"

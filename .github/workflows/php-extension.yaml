@@ -53,7 +53,7 @@ jobs:
           PHP_VERSION=$(./.github/hcl_get_variable.sh vars-${INPUT_PHP_VERSION}.hcl PHP_VERSION)
           echo "php-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
 
-          ext_version_var=$(echo "$EXTENSION" | tr '[:lower:]' '[:upper:]')_VERSION
+          ext_version_var=$(echo "$EXTENSION" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
           ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
           if [[ -z "$ext_version" ]]; then
             echo "ext-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
@@ -119,6 +119,7 @@ jobs:
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
+            *.args.PHP_VARIANT=${{ inputs.php-variant }}
             php-ext-${{ inputs.extension }}.output=type=oci,dest=php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-ext-${{ inputs.extension }}-test.output=type=docker
             php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
