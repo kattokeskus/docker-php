@@ -22,6 +22,10 @@ variable "VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/libvips versioning=semver
     default = "8.18.2"
 }
+variable "VIPS_PREVIOUS_VERSION" {
+    # renovate: datasource=github-releases depName=libvips/libvips-previous versioning=semver
+    default = "8.17.3"
+}
 variable "PHP_VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/php-vips versioning=semver
     default = "2.5.0"

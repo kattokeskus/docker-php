@@ -65,6 +65,18 @@
                 "custom.pecl"
             ],
             "extractVersion": "version=(?<version>.+)$"
+        },
+        {
+            "description": "libvips-previous",
+            "matchManagers": [
+                "custom.regex"
+            ],
+            "matchDepNames": [
+                "libvips/libvips-previous"
+            ],
+            "overridePackageName": "libvips/libvips",
+            // renovate: datasource=github-releases depName=libvips/libvips versioning=semver-partial
+            "allowedVersions": "<8.18"
         }
     ],
     "labels": [
@@ -84,6 +96,15 @@
             ],
             "matchStrings": [
                 "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s+default = \"(?<currentValue>[^\"]+)\""
+            ]
+        },
+        {
+            "customType": "regex",
+            "managerFilePatterns": [
+                "/renovate.json5?$/"
+            ],
+            "matchStrings": [
+                "// renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s+\"allowedVersions\": \"[<>=]?(?<currentValue>[^\"]+)\""
             ]
         }
     ],

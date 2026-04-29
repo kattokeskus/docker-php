@@ -140,7 +140,7 @@ jobs:
           do
             build_hash=$(./.github/build_hash.sh "$INPUT_PHP_VERSION" "$PHP_VARIANT" "$extension")
 
-            ext_version_var=$(echo "$extension" | tr '[:lower:]' '[:upper:]')_VERSION
+            ext_version_var=$(echo "$extension" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
             ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
             if [[ -z "$ext_version" ]]; then
               ext_version="${PHP_VERSION}"
@@ -269,6 +269,7 @@ jobs:
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
+            *.args.PHP_VARIANT=${{ inputs.php-variant }}
             php-base.output=type=oci,dest=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-base.cache-from=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
             php-base.cache-to=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
