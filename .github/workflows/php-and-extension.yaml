@@ -141,9 +141,20 @@ jobs:
             build_hash=$(./.github/build_hash.sh "$INPUT_PHP_VERSION" "$PHP_VARIANT" "$extension")
 
             ext_version_var=$(echo "$extension" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
-            ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+            ext_version="$(./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
             if [[ -z "$ext_version" ]]; then
               ext_version="${PHP_VERSION}"
+            fi
+
+            image_extension="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+              docker buildx bake --print \
+              -f docker-bake.hcl \
+              -f vars.hcl \
+              -f "vars-${INPUT_PHP_VERSION}.hcl" \
+              "php-ext-${extension}" 2>/dev/null \
+              | jq -r --arg target "php-ext-${extension}" '.target[$target].args.EXTENSION // empty')"
+            if [[ -z "$image_extension" ]]; then
+              image_extension="$extension"
             fi
 
             extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash}" '. + {$extension: $build_hash}')"
@@ -152,7 +163,7 @@ jobs:
             headers="$(curl -sIL \
               -H "Authorization: Bearer $REGISTRY_TOKEN" \
               -H "Accept: application/vnd.oci.image.index.v1+json" \
-              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/build-${build_hash}" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${image_extension}/manifests/build-${build_hash}" \
               2>/dev/null)"
             echo "$headers" | head -n1 | grep '^HTTP/' | grep -q 200 && available=1 || available=0
 
@@ -168,7 +179,7 @@ jobs:
             curl -sfL \
               -H "Authorization: Bearer $REGISTRY_TOKEN" \
               -H "Accept: application/vnd.oci.image.index.v1+json" \
-              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${extension}/manifests/${ext_version}-php${PHP_VERSION}-${PHP_VARIANT}" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY}/ext/${image_extension}/manifests/${ext_version}-php${PHP_VERSION}-${PHP_VARIANT}" \
               | grep -i '^docker-content-digest:' | grep -iq "$digest" \
               > /dev/null 2>&1 && tag_available=1 || tag_available=0
 
@@ -178,26 +189,28 @@ jobs:
           done < <(echo "$EXTENSIONS" | jq -r '.[]')
 
           echo "extensions:"
-          echo "${extensions[@]}" | tr ' ' '\n'
+          printf '%s\n' "${extensions[@]}"
           echo
           echo "extensions-without-tags:"
-          echo "${extensions_without_tags[@]}" | tr ' ' '\n'
+          printf '%s\n' "${extensions_without_tags[@]}"
           echo
           echo "extension-build-hashes:"
           echo "$extension_build_hashes" | jq -r .
           echo
 
           if [[ ${#extensions[@]} -eq 0 ]]; then
-            echo "extensions=[]" >> $GITHUB_OUTPUT
+            echo "extensions=[]" >> "$GITHUB_OUTPUT"
           else
-            echo "extensions=[$(echo ${extensions[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+            extensions_json="$(printf '%s\n' "${extensions[@]}" | jq -R . | jq -sc .)"
+            echo "extensions=${extensions_json}" >> "$GITHUB_OUTPUT"
           fi
           if [[ ${#extensions_without_tags[@]} -eq 0 ]]; then
-            echo "extensions-without-tags=[]" >> $GITHUB_OUTPUT
+            echo "extensions-without-tags=[]" >> "$GITHUB_OUTPUT"
           else
-            echo "extensions-without-tags=[$(echo ${extensions_without_tags[@]} | tr ' ' '\n' | sed -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+            extensions_without_tags_json="$(printf '%s\n' "${extensions_without_tags[@]}" | jq -R . | jq -sc .)"
+            echo "extensions-without-tags=${extensions_without_tags_json}" >> "$GITHUB_OUTPUT"
           fi
-          echo "extension-build-hashes=${extension_build_hashes}" >> $GITHUB_OUTPUT
+          echo "extension-build-hashes=${extension_build_hashes}" >> "$GITHUB_OUTPUT"
 
   build-base-images:
     needs: [php-version]

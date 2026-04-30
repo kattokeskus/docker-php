@@ -18,7 +18,7 @@ variable "REDIS_VERSION" {
 }
 variable "VIPS_VERSION" {
 }
-variable "VIPS_PREVIOUS_VERSION" {
+variable "VIPS_PREV_VERSION" {
 }
 variable "PHP_VIPS_VERSION" {
 }
@@ -926,7 +926,7 @@ target "php-ext-vips-prev" {
   args = {
     PHP_EXT_BASE_IMAGE = "php-ext-base"
     PHP_BASE_IMAGE = "php-base"
-    VIPS_VERSION = "${VIPS_PREVIOUS_VERSION}"
+    VIPS_VERSION = "${VIPS_PREV_VERSION}"
     PHP_VIPS_VERSION = "${PHP_VIPS_VERSION}"
     EXTENSION = "vips"
     EXTENSION_SCRATCH_IMAGE = "php-ext-ffi"
