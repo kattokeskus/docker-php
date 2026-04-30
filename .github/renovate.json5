@@ -67,12 +67,12 @@
             "extractVersion": "version=(?<version>.+)$"
         },
         {
-            "description": "libvips-previous",
+            "description": "libvips-prev",
             "matchManagers": [
                 "custom.regex"
             ],
             "matchDepNames": [
-                "libvips/libvips-previous"
+                "libvips/libvips-prev"
             ],
             "overridePackageName": "libvips/libvips",
             // renovate: datasource=github-releases depName=libvips/libvips versioning=semver-partial

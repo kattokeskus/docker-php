@@ -916,10 +916,10 @@ target "php-ext-vips-test" {
 }
 
 
-target "php-ext-vips-previous-metadata" {
+target "php-ext-vips-prev-metadata" {
 }
-target "php-ext-vips-previous" {
-  inherits = ["php-version", "php-ext-vips-previous-metadata"]
+target "php-ext-vips-prev" {
+  inherits = ["php-version", "php-ext-vips-prev-metadata"]
   context = "extensions/vips"
   dockerfile = "Dockerfile"
   platforms = ["linux/amd64", "linux/arm64"]
@@ -942,8 +942,8 @@ target "php-ext-vips-previous" {
     php-ext-ffi = "target:php-ext-ffi"
   }
 }
-target "php-ext-vips-previous-test" {
-    inherits = ["php-ext-vips-previous"]
+target "php-ext-vips-prev-test" {
+    inherits = ["php-ext-vips-prev"]
     target = "test"
 }
 
@@ -1125,7 +1125,7 @@ group "extensions" {
     "php-ext-sysvshm",
     "php-ext-tidy",
     "php-ext-vips",
-    "php-ext-vips-previous",
+    "php-ext-vips-prev",
     "php-ext-xdebug",
     "php-ext-xhprof",
     //"php-ext-xml",
@@ -1191,7 +1191,7 @@ group "extensions-test" {
     "php-ext-sysvshm-test",
     "php-ext-tidy-test",
     "php-ext-vips-test",
-    "php-ext-vips-previous-test",
+    "php-ext-vips-prev-test",
     "php-ext-xdebug-test",
     "php-ext-xhprof-test",
     //"php-ext-xml-test",

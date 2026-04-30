@@ -39,6 +39,7 @@ jobs:
       php-version: ${{ steps.extension-version.outputs.php-version }}
       ext-version: ${{ steps.extension-version.outputs.ext-version }}
       ext-version-var: ${{ steps.extension-version.outputs.ext-version-var }}
+      image-extension: ${{ steps.extension-version.outputs.image-extension }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -50,18 +51,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          PHP_VERSION=$(./.github/hcl_get_variable.sh vars-${INPUT_PHP_VERSION}.hcl PHP_VERSION)
-          echo "php-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+          PHP_VERSION=$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_VERSION)
+          echo "php-version=${PHP_VERSION}" >> "$GITHUB_OUTPUT"
 
           ext_version_var=$(echo "$EXTENSION" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
-          ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+          ext_version="$(./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
           if [[ -z "$ext_version" ]]; then
-            echo "ext-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
-            echo "ext-version-var=PHP_EXT_VERSION" >> $GITHUB_OUTPUT
+            echo "ext-version=${PHP_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "ext-version-var=PHP_EXT_VERSION" >> "$GITHUB_OUTPUT"
           else
-            echo "ext-version=${ext_version}" >> $GITHUB_OUTPUT
-            echo "ext-version-var=${ext_version_var}" >> $GITHUB_OUTPUT
+            echo "ext-version=${ext_version}" >> "$GITHUB_OUTPUT"
+            echo "ext-version-var=${ext_version_var}" >> "$GITHUB_OUTPUT"
           fi
+
+          image_extension="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT=bookworm \
+            docker buildx bake --print \
+            -f docker-bake.hcl \
+            -f vars.hcl \
+            -f "vars-${INPUT_PHP_VERSION}.hcl" \
+            "php-ext-${EXTENSION}" 2>/dev/null \
+            | jq -r --arg target "php-ext-${EXTENSION}" '.target[$target].args.EXTENSION // empty')"
+          if [[ -z "$image_extension" ]]; then
+            image_extension="$EXTENSION"
+          fi
+          echo "image-extension=${image_extension}" >> "$GITHUB_OUTPUT"
 
   build-and-test-extension:
     if: inputs.build == '1'
@@ -78,16 +91,16 @@ jobs:
         id: metadata
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
         with:
-          images: ghcr.io/${{ github.repository }}/ext/${{ inputs.extension }}
+          images: ghcr.io/${{ github.repository }}/ext/${{ needs.extension-version.outputs.image-extension }}
           tags: |
             type=sha
           labels: |
-            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ needs.extension-version.outputs.image-extension }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
           annotations: |
-            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ inputs.extension }}
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ needs.extension-version.outputs.image-extension }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
@@ -166,6 +179,7 @@ jobs:
           PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
           EXTENSION: ${{ inputs.extension }}
+          IMAGE_EXTENSION: ${{ needs.extension-version.outputs.image-extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           BUILD_HASH: ${{ inputs.build-hash }}
@@ -183,15 +197,14 @@ jobs:
               exit 1
             fi
 
-            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}-${arch}"
+            tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}-${arch}"
 
             skopeo --override-arch="$arch" copy oci-archive:"$archive" docker://"$tag"
             tags+=("$tag")
           done
 
-          target_tag="ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
           docker buildx imagetools create "${tags[@]}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}"
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}"
 
   tag-main-images:
     if: >-
@@ -214,6 +227,7 @@ jobs:
           PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
           EXTENSION: ${{ inputs.extension }}
+          IMAGE_EXTENSION: ${{ needs.extension-version.outputs.image-extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           BUILD_HASH: ${{ inputs.build-hash }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -221,13 +235,13 @@ jobs:
           set -euo pipefail
 
           docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
 
           docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:php${PHP_VERSION}-${PHP_VARIANT}"
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:php${PHP_VERSION}-${PHP_VARIANT}"
 
           docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${EXTENSION}:php${INPUT_PHP_VERSION}-${PHP_VARIANT}"
+            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:php${INPUT_PHP_VERSION}-${PHP_VARIANT}"
