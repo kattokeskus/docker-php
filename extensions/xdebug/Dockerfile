@@ -5,6 +5,7 @@ ARG XDEBUG_VERSION
 FROM --platform=$BUILDPLATFORM ${PHP_EXT_BASE_IMAGE} AS php-ext-xdebug-build
 ARG TARGETARCH
 ARG BUILDARCH
+ARG GCC_VERSION=14
 
 ARG XDEBUG_VERSION
 RUN mkdir -p /usr/src/php/ext \
@@ -20,8 +21,8 @@ RUN cd /usr/src/php/ext/xdebug \
         --build `echo ${BUILDARCH} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
         --host `echo ${TARGETARCH} | sed  -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
         `[ "${TARGETARCH}" != "${BUILDARCH}" ] \
-            && echo CC=${TARGETARCH}-linux-gnu-gcc-12 | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
-            && echo CXX=${TARGETARCH}-linux-gnu-g++-12 | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+            && echo CC=${TARGETARCH}-linux-gnu-gcc-${GCC_VERSION} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+            && echo CXX=${TARGETARCH}-linux-gnu-g++-${GCC_VERSION} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
             && echo PKG_CONFIG=/usr/bin/${TARGETARCH}-linux-gnu-pkg-config | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
         ` \
     && make -j$(nproc) \

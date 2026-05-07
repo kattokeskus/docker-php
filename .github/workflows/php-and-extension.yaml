@@ -146,11 +146,12 @@ jobs:
               ext_version="${PHP_VERSION}"
             fi
 
-            image_extension="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+            image_extension="$(PHP_VERSION="$PHP_VERSION" \
               docker buildx bake --print \
               -f docker-bake.hcl \
               -f vars.hcl \
               -f "vars-${INPUT_PHP_VERSION}.hcl" \
+              -f "php-${PHP_VARIANT}.hcl" \
               "php-ext-${extension}" 2>/dev/null \
               | jq -r --arg target "php-ext-${extension}" '.target[$target].args.EXTENSION // empty')"
             if [[ -z "$image_extension" ]]; then
@@ -267,14 +268,14 @@ jobs:
       - name: Build PHP base images
         uses: docker/bake-action@a66e1c87e2eca0503c343edf1d208c716d54b8a8 # v7.1.0
         env:
-          PHP_VERSION: ${{ inputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
+          PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
         with:
           source: .
           files: |
             ./docker-bake.hcl
             ./vars.hcl
             ./vars-${{ inputs.php-version }}.hcl
+            ./php-${{ inputs.php-variant }}.hcl
             cwd://${{ steps.metadata-php-base.outputs.bake-file-tags }}
             cwd://${{ steps.metadata-php-base.outputs.bake-file-annotations }}
             cwd://${{ steps.metadata-php-ext-base.outputs.bake-file-tags }}
@@ -282,7 +283,6 @@ jobs:
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
-            *.args.PHP_VARIANT=${{ inputs.php-variant }}
             php-base.output=type=oci,dest=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-base.cache-from=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
             php-base.cache-to=type=gha,scope=php-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max

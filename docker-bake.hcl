@@ -1,6 +1,10 @@
 variable "PHP_VERSION" {
 }
 variable "PHP_VARIANT" {
+    default = "trixie"
+}
+variable "GCC_VERSION" {
+    default = "14"
 }
 
 /***********************/
@@ -31,6 +35,7 @@ variable "XHPROF_VERSION" {
 
 target "php-version" {
     args = {
+        GCC_VERSION = "${GCC_VERSION}"
         PHP_VARIANT = "${PHP_VARIANT}"
         PHP_VERSION = "${PHP_VERSION}"
     }

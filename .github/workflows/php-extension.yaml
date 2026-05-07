@@ -47,6 +47,7 @@ jobs:
         id: extension-version
         env:
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          INPUT_PHP_VARIANT: ${{ inputs.php-variant }}
           EXTENSION: ${{ inputs.extension }}
         run: |
           set -euo pipefail
@@ -64,11 +65,12 @@ jobs:
             echo "ext-version-var=${ext_version_var}" >> "$GITHUB_OUTPUT"
           fi
 
-          image_extension="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT=bookworm \
+          image_extension="$(PHP_VERSION="$PHP_VERSION" \
             docker buildx bake --print \
             -f docker-bake.hcl \
             -f vars.hcl \
             -f "vars-${INPUT_PHP_VERSION}.hcl" \
+            -f "php-${INPUT_PHP_VARIANT}.hcl" \
             "php-ext-${EXTENSION}" 2>/dev/null \
             | jq -r --arg target "php-ext-${EXTENSION}" '.target[$target].args.EXTENSION // empty')"
           if [[ -z "$image_extension" ]]; then
@@ -119,7 +121,6 @@ jobs:
         uses: docker/bake-action@a66e1c87e2eca0503c343edf1d208c716d54b8a8 # v7.1.0
         env:
           PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
           ${{ needs.extension-version.outputs.ext-version-var }}: ${{ needs.extension-version.outputs.ext-version }}
         with:
           source: .
@@ -127,12 +128,12 @@ jobs:
             ./docker-bake.hcl
             ./vars.hcl
             ./vars-${{ inputs.php-version }}.hcl
+            ./php-${{ inputs.php-variant }}.hcl
             cwd://${{ steps.metadata.outputs.bake-file-tags }}
             cwd://${{ steps.metadata.outputs.bake-file-annotations }}
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
-            *.args.PHP_VARIANT=${{ inputs.php-variant }}
             php-ext-${{ inputs.extension }}.output=type=oci,dest=php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-ext-${{ inputs.extension }}-test.output=type=docker
             php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
