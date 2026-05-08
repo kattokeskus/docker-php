@@ -18,14 +18,19 @@ if [ ! -f "vars-${INPUT_PHP_VERSION}.hcl" ]; then
     echo "vars-${INPUT_PHP_VERSION}.hcl not found"
     exit 1
 fi
+if [ ! -f "php-${PHP_VARIANT}.hcl" ]; then
+    echo "php-${PHP_VARIANT}.hcl not found"
+    exit 1
+fi
 
 PHP_VERSION=$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_VERSION)
 
-PHP_BAKE="$(PHP_VERSION="${PHP_VERSION}" PHP_VARIANT="${PHP_VARIANT}" \
+PHP_BAKE="$(PHP_VERSION="${PHP_VERSION}" \
     docker buildx bake --print \
     -f docker-bake.hcl \
     -f "vars.hcl" \
     -f "vars-${INPUT_PHP_VERSION}.hcl" \
+    -f "php-${PHP_VARIANT}.hcl" \
     php-base php-ext-base 2>/dev/null)"
 
 # Parse context
@@ -66,11 +71,12 @@ if [[ -z "$ext_version" ]]; then
 fi
 export $ext_version_var="$ext_version"
 
-EXTENSION_BAKE="$(PHP_VERSION="$PHP_VERSION" PHP_VARIANT="$PHP_VARIANT" \
+EXTENSION_BAKE="$(PHP_VERSION="$PHP_VERSION" \
     docker buildx bake --print \
     -f docker-bake.hcl \
     -f "vars.hcl" \
     -f "vars-${INPUT_PHP_VERSION}.hcl" \
+    -f "php-${PHP_VARIANT}.hcl" \
     php-ext-${EXTENSION} php-ext-${EXTENSION}-test 2>/dev/null)"
 
 # Parse context

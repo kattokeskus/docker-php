@@ -6,6 +6,7 @@ ARG IMAGICK_VERSION
 FROM --platform=$BUILDPLATFORM ${PHP_EXT_BASE_IMAGE} AS imagemagick-build
 ARG TARGETARCH
 ARG BUILDARCH
+ARG GCC_VERSION=14
 ARG BUILDDEPS=
 ARG DEPS=
 
@@ -43,8 +44,8 @@ RUN cd /usr/src/ImageMagick \
         --build `echo ${BUILDARCH} | sed  -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
         --host `echo ${TARGETARCH} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
         `[ "${TARGETARCH}" != "${BUILDARCH}" ] \
-            && echo CC=${TARGETARCH}-linux-gnu-gcc-12 | sed  -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
-            && echo CXX=${TARGETARCH}-linux-gnu-g++-12 | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+            && echo CC=${TARGETARCH}-linux-gnu-gcc-${GCC_VERSION} | sed  -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+            && echo CXX=${TARGETARCH}-linux-gnu-g++-${GCC_VERSION} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
             && echo PKG_CONFIG=/usr/bin/${TARGETARCH}-linux-gnu-pkg-config | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
         `
 # Install imagemagick
@@ -138,6 +139,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
 FROM --platform=$BUILDPLATFORM ${PHP_EXT_BASE_IMAGE} AS php-ext-imagick-build
 ARG TARGETARCH
 ARG BUILDARCH
+ARG GCC_VERSION=14
 
 COPY --from=imagemagick / /install
 RUN TARGETARCH=${TARGETARCH} \
@@ -158,8 +160,8 @@ RUN cd /usr/src/php/ext/imagick \
     --build `echo ${BUILDARCH} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
     --host `echo ${TARGETARCH} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \
     `[ "${TARGETARCH}" != "${BUILDARCH}" ] \
-        && echo CC=${TARGETARCH}-linux-gnu-gcc-12 | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
-        && echo CXX=${TARGETARCH}-linux-gnu-g++-12 | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+        && echo CC=${TARGETARCH}-linux-gnu-gcc-${GCC_VERSION} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
+        && echo CXX=${TARGETARCH}-linux-gnu-g++-${GCC_VERSION} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
         && echo PKG_CONFIG=/usr/bin/${TARGETARCH}-linux-gnu-pkg-config | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' \
     ` \
     && make -j$(nproc) \

@@ -2,6 +2,8 @@ variable "PHP_VERSION" {
 }
 variable "PHP_VARIANT" {
 }
+variable "GCC_VERSION" {
+}
 
 /***********************/
 /* Dependency versions */
@@ -31,6 +33,7 @@ variable "XHPROF_VERSION" {
 
 target "php-version" {
     args = {
+        GCC_VERSION = "${GCC_VERSION}"
         PHP_VARIANT = "${PHP_VARIANT}"
         PHP_VERSION = "${PHP_VERSION}"
     }

@@ -10,6 +10,7 @@ FROM ${EXTENSION_SCRATCH_IMAGE} AS extension-scratch
 FROM --platform=$BUILDPLATFORM ${PHP_EXT_BASE_IMAGE} AS vips-build
 ARG TARGETARCH
 ARG BUILDARCH
+ARG GCC_VERSION=14
 
 ARG BUILDDEPS=
 ARG CONFIGURE=
@@ -34,8 +35,8 @@ RUN cd /usr/src/vips \
         [ "${TARGETARCH}" = "${BUILDARCH}" ] \
         || ( \
             echo "[binaries]" >> cross-file.txt \
-            && echo "c = '${TARGETARCH}-linux-gnu-gcc-12'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
-            && echo "cpp = '${TARGETARCH}-linux-gnu-g++-12'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
+            && echo "c = '${TARGETARCH}-linux-gnu-gcc-${GCC_VERSION}'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
+            && echo "cpp = '${TARGETARCH}-linux-gnu-g++-${GCC_VERSION}'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
             && echo "ar = '${TARGETARCH}-linux-gnu-ar'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
             && echo "strip = '${TARGETARCH}-linux-gnu-strip'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \
             && echo "pkgconfig = '${TARGETARCH}-linux-gnu-pkg-config'" | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#' >> cross-file.txt \

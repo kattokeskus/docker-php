@@ -15,7 +15,7 @@ To install a prebuilt extension into your PHP image, mount the extension image a
 
 ```dockerfile
 ARG PHP_VERSION=8.4.17
-ARG PHP_VARIANT=bookworm
+ARG PHP_VARIANT=trixie
 ARG EXTENSION=redis
 ARG EXTENSION_VERSION=6.3.0
 FROM php:${PHP_VERSION}-${PHP_VARIANT}
@@ -28,7 +28,7 @@ RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/${EXTENSION}:${EXT
     /ext/install.sh
 ```
 
-> **Note:** Check [vars-8.3.hcl](vars-8.3.hcl), [vars-8.4.hcl](vars-8.4.hcl), or [vars-8.5.hcl](vars-8.5.hcl) for exact PHP versions as they are updated by Renovate.
+> **Note:** Check [vars-8.3.hcl](vars-8.3.hcl), [vars-8.4.hcl](vars-8.4.hcl), or [vars-8.5.hcl](vars-8.5.hcl) for exact PHP versions as they are updated by Renovate. Build variants are defined in [php-trixie.hcl](php-trixie.hcl) and [php-bookworm.hcl](php-bookworm.hcl).
 
 ## Tag Format
 
