@@ -36,7 +36,7 @@ variable "SPX_VERSION" {
 }
 variable "XDEBUG_VERSION" {
     # renovate: datasource=custom.pecl depName=xdebug versioning=semver
-    default = "3.5.1"
+    default = "3.5.3"
 }
 variable "XHPROF_VERSION" {
     # renovate: datasource=custom.pecl depName=xhprof versioning=semver
