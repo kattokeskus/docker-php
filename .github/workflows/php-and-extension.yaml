@@ -266,7 +266,7 @@ jobs:
             org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
           bake-target: php-ext-base-metadata
       - name: Build PHP base images
-        uses: docker/bake-action@6614cfa25eff9a0b2b2697efb0b6159e7680d584 # v7.2.0
+        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           PHP_VERSION: ${{ needs.php-version.outputs.php-version }}
         with:
