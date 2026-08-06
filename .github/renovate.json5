@@ -12,7 +12,6 @@
         "custom.regex"
     ],
     "prHourlyLimit": 0,
-    "fetchChangeLogs": "off",
     "baseBranchPatterns": [
         "main"
     ],
