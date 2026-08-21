@@ -144,6 +144,7 @@ jobs:
           targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
           github-token: ${{ github.token }}
       - name: Test PHP extension
+        id: test-extension
         continue-on-error: true
         env:
           TEST_IMAGE: localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
@@ -158,6 +159,11 @@ jobs:
         with:
           name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
           path: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+      - name: Break on test failure
+        if: steps.test-extension.outcome == 'failure'
+        run: |
+          echo "PHP extension test failed" >&2
+          exit 1
 
   merge-extension-images:
     needs: [extension-version, build-and-test-extension]
