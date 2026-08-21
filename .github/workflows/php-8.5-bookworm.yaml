@@ -8,6 +8,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      extensions:
+        description: 'Extensions: empty for automatic detection, comma-separated names, or * for all'
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +29,7 @@ jobs:
     with:
       php-version: 8.5
       php-variant: bookworm
+      extensions: ${{ inputs.extensions }}
 
   rerun-on-failure:
     needs: [php-and-extensions]

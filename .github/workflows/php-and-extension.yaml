@@ -11,6 +11,11 @@ on:
         type: string
         description: The PHP variant
         required: true
+      extensions:
+        type: string
+        description: Extensions to build; empty for automatic detection, comma-separated names, or * for all
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -122,6 +127,7 @@ jobs:
         id: extensions
         env:
           EXTENSIONS: ${{ needs.parse-extensions.outputs.extensions }}
+          INPUT_EXTENSIONS: ${{ inputs.extensions }}
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
@@ -136,6 +142,26 @@ jobs:
           extensions=()
           extensions_without_tags=()
           extension_build_hashes='{}'
+
+          force_extensions=0
+          selected_extensions="$EXTENSIONS"
+          if [[ -n "$INPUT_EXTENSIONS" ]]; then
+            force_extensions=1
+            if [[ "$INPUT_EXTENSIONS" != "*" ]]; then
+              selected_extensions="$(jq -cn \
+                --arg extensions "$INPUT_EXTENSIONS" \
+                '$extensions | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique')"
+              invalid_extensions="$(jq -cn \
+                --argjson selected "$selected_extensions" \
+                --argjson available "$EXTENSIONS" \
+                '$selected - $available')"
+              if [[ "$(echo "$invalid_extensions" | jq length)" -ne 0 ]]; then
+                echo "Invalid extensions: $(echo "$invalid_extensions" | jq -r 'join(", ")')" >&2
+                exit 1
+              fi
+            fi
+          fi
+
           while read -r extension
           do
             build_hash=$(./.github/build_hash.sh "$INPUT_PHP_VERSION" "$PHP_VARIANT" "$extension")
@@ -159,6 +185,11 @@ jobs:
             fi
 
             extension_build_hashes="$(echo "$extension_build_hashes" | jq -c --arg extension "$extension" --arg build_hash "${build_hash}" '. + {$extension: $build_hash}')"
+
+            if [[ "$force_extensions" == "1" ]]; then
+              extensions+=("$extension")
+              continue
+            fi
 
             # Check if extension image is already built
             headers="$(curl -sIL \
@@ -187,7 +218,7 @@ jobs:
             if [[ "$tag_available" == "0" ]]; then
               extensions_without_tags+=("$extension")
             fi
-          done < <(echo "$EXTENSIONS" | jq -r '.[]')
+          done < <(echo "$selected_extensions" | jq -r '.[]')
 
           echo "extensions:"
           printf '%s\n' "${extensions[@]}"
