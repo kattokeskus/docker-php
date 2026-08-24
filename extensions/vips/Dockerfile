@@ -76,7 +76,7 @@ RUN mkdir -p /install/usr/local/bin \
         && echo '# Install FFI' \
         && echo 'if [ "${SKIP_FFI:-0}" -ne 1 ]; then' \
         && echo '  ./install-ffi.sh || true' \
-        && echo '  if ! php -m | grep -q "^FFI$"; then' \
+        && echo '  if ! php -m | grep "^FFI$" > /dev/null; then' \
         && echo '    echo "FFI extension not active" >&2' \
         && echo '    exit 1' \
         && echo '  fi' \
@@ -142,7 +142,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     && apt-get install -y -qq \
         bc \
     && /usr/src/vips/install.sh \
-    && php -m | grep -q "^FFI$" \
+    && php -m | grep "^FFI$" > /dev/null \
     && vips --version
 
 COPY --from=php-vips-source /usr/src/php-vips /usr/src/php-vips
@@ -181,9 +181,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     --mount=type=bind,from=extension-scratch,target=/usr/src/ffi \
     --mount=type=bind,from=vips,target=/usr/src/vips \
     /usr/src/ffi/install.sh \
-    && php -m | grep -q "^FFI$" \
+    && php -m | grep "^FFI$" > /dev/null \
     && /usr/src/vips/install.sh \
-    && php -m | grep -q "^FFI$" \
+    && php -m | grep "^FFI$" > /dev/null \
     && vips --version \
     && touch /vips-test-ffi-installed.ok
 
@@ -192,7 +192,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     --mount=type=cache,target=/var/lib/apt,sharing=private \
     --mount=type=bind,from=vips,target=/usr/src/vips \
     SKIP_FFI=1 /usr/src/vips/install.sh \
-    && if php -m | grep -q "^FFI$"; then \
+    && if php -m | grep "^FFI$" > /dev/null; then \
         echo "FFI extension unexpectedly active" >&2; \
         exit 1; \
     fi \
