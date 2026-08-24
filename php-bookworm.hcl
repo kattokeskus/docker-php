@@ -5,3 +5,7 @@ variable "PHP_VARIANT" {
 variable "GCC_VERSION" {
     default = "12"
 }
+
+variable "VIPS_HEIF_DEPS" {
+    default = ""
+}

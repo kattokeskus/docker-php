@@ -96,9 +96,18 @@ if [[ ! -d "$context" ]]; then
     exit 1
 fi
 
-# Add build hash and build context hash to bake output
-context_hash="$(find "$context" -type f -exec cat {} + | sha256sum | cut -d' ' -f1)"
-EXTENSION_BAKE="$(echo "$EXTENSION_BAKE" | jq -r --arg context_hash "$context_hash" --arg build_hash "$BUILD_HASH" '. + {context_hash: $context_hash, build_hash: $build_hash}')"
+# Add build hash and build context hash to bake output. Test patches are
+# extension-specific, so exclude the directory from the shared context hash.
+context_hash="$(find "$context" -type f ! -path "$context/patches/*" -exec cat {} + | sha256sum | cut -d' ' -f1)"
+test_patch_hash=""
+test_patch="$context/patches/${EXTENSION}.sh"
+if [[ -f "$test_patch" ]]; then
+    test_patch_hash="$(sha256sum "$test_patch" | cut -d' ' -f1)"
+fi
+EXTENSION_BAKE="$(echo "$EXTENSION_BAKE" | jq -r \
+    --arg context_hash "$context_hash" --arg build_hash "$BUILD_HASH" \
+    --arg test_patch_hash "$test_patch_hash" \
+    '. + {context_hash: $context_hash, build_hash: $build_hash} + (if $test_patch_hash == "" then {} else {test_patch_hash: $test_patch_hash} end)')"
 
 EXTENSION_BUILD_HASH_FULL="$(echo "$EXTENSION_BAKE" | sha256sum | cut -d' ' -f1)"
 

@@ -144,20 +144,39 @@ jobs:
           targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
           github-token: ${{ github.token }}
       - name: Test PHP extension
+        id: test-extension
         continue-on-error: true
         env:
           TEST_IMAGE: localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
         run: |
-          set -e
+          set -euo pipefail
 
           docker run --rm \
             --pull=never \
-            "$TEST_IMAGE"
+            "$TEST_IMAGE" 2>&1 | tee test-result.log
+      - name: Upload PHP extension test result
+        if: steps.test-extension.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test-result
+          path: test-result.log
       - name: Upload PHP extension artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
           path: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+      - name: Break on test failure
+        if: steps.test-extension.outcome == 'failure'
+        run: |
+          echo "::error::PHP extension test failed"
+          {
+            echo '## PHP extension test failed'
+            echo
+            echo '```text'
+            cat test-result.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
   merge-extension-images:
     needs: [extension-version, build-and-test-extension]

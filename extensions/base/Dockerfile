@@ -127,20 +127,26 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     REINSTALL=1 /usr/src/php-ext/install.sh
 
 RUN --mount=type=bind,from=php-ext-build,source=/usr/src/php,target=/src/php,rw \
+    --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/${EXTENSION} /usr/src/php/ext/${EXTENSION} \
     && cp -r /src/php/ext/standard /usr/src/php/ext/standard \
     && cp -r /src/php/ext/dl_test /usr/src/php/ext/dl_test \
     && cp -r /src/php/sapi /usr/src/php/sapi \
+    && cp /src/php/run-tests.php /usr/src/php/run-tests.php \
     && (echo "${EXTENSION}" | grep -qv "^pdo_" || cp -r /src/php/ext/pdo /usr/src/php/ext/pdo) \
     && cd /usr/src/php/ext/${EXTENSION} \
+    && if [ -f "/usr/src/php-test-patches/${EXTENSION}.sh" ]; then \
+        bash "/usr/src/php-test-patches/${EXTENSION}.sh"; \
+    fi \
     && sed -i 's#test: all#test:#' Makefile \
     && rm -rf .libs modules \
     && mkdir modules \
     && ln -s "$(php-config --extension-dir)/${EXTENSION}.so" modules/${EXTENSION}.so \
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \
-    && echo 'php run-tests.php -j$(nproc) -q' >> run.sh \
+    && echo 'export TEST_PHP_SRCDIR=/usr/src/php' >> run.sh \
+    && echo "php /usr/src/php/run-tests.php -j\$(nproc) -q --show-diff /usr/src/php/ext/${EXTENSION}/tests" >> run.sh \
     && chmod +x run.sh
 
 WORKDIR /usr/src/php/ext/${EXTENSION}
