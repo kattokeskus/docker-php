@@ -66,11 +66,21 @@ COPY --from=extension-scratch / /install/
 RUN mkdir -p /install/usr/local/bin \
         /install/usr/local/include \
         /install/usr/local/share/doc/vips \
+    && mv /install/install.sh /install/install-ffi.sh \
     && ( \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
         && echo 'cd "$(dirname "${BASH_SOURCE[0]}")"' \
+        && echo \
+        && echo '# Install FFI' \
+        && echo 'if [ "${SKIP_FFI:-0}" -ne 1 ]; then' \
+        && echo '  ./install-ffi.sh || true' \
+        && echo '  if ! php -m | grep "^FFI$" > /dev/null; then' \
+        && echo '    echo "FFI extension not active" >&2' \
+        && echo '    exit 1' \
+        && echo '  fi' \
+        && echo 'fi' \
         && echo \
         && echo '# Install dependencies' \
         && echo "DEPS=\"${DEPS}\"" \
@@ -93,7 +103,7 @@ RUN mkdir -p /install/usr/local/bin \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'ldconfig' \
         && echo 'vips --version' \
-    ) >> /install/install.sh \
+    ) > /install/install.sh \
     && chmod +x /install/install.sh \
     && cp -p /usr/local/bin/vips* /install/usr/local/bin/ \
     && cp -rp /usr/local/include/vips /install/usr/local/include/ \
@@ -131,7 +141,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     apt-get update \
     && apt-get install -y -qq \
         bc \
-    && /usr/src/vips/install.sh
+    && /usr/src/vips/install.sh \
+    && php -m | grep "^FFI$" > /dev/null \
+    && vips --version
 
 COPY --from=php-vips-source /usr/src/php-vips /usr/src/php-vips
 
@@ -163,6 +175,32 @@ RUN --mount=type=bind,from=vips-build,source=/usr/src/vips,target=/src/vips,rw \
 WORKDIR /usr/src/vips
 CMD ["./run.sh"]
 
+FROM ${PHP_BASE_IMAGE} AS vips-test-ffi-installed
+RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
+    --mount=type=cache,target=/var/lib/apt,sharing=private \
+    --mount=type=bind,from=extension-scratch,target=/usr/src/ffi \
+    --mount=type=bind,from=vips,target=/usr/src/vips \
+    /usr/src/ffi/install.sh \
+    && php -m | grep "^FFI$" > /dev/null \
+    && /usr/src/vips/install.sh \
+    && php -m | grep "^FFI$" > /dev/null \
+    && vips --version \
+    && touch /vips-test-ffi-installed.ok
+
+FROM ${PHP_BASE_IMAGE} AS vips-test-skip-ffi
+RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
+    --mount=type=cache,target=/var/lib/apt,sharing=private \
+    --mount=type=bind,from=vips,target=/usr/src/vips \
+    SKIP_FFI=1 /usr/src/vips/install.sh \
+    && if php -m | grep "^FFI$" > /dev/null; then \
+        echo "FFI extension unexpectedly active" >&2; \
+        exit 1; \
+    fi \
+    && vips --version \
+    && touch /vips-test-skip-ffi.ok
+
 FROM vips-test AS test
+COPY --from=vips-test-ffi-installed /vips-test-ffi-installed.ok /
+COPY --from=vips-test-skip-ffi /vips-test-skip-ffi.ok /
 
 FROM vips AS default
