@@ -20,7 +20,7 @@ variable "REDIS_VERSION" {
 }
 variable "VIPS_VERSION" {
     # renovate: datasource=github-releases depName=libvips/libvips versioning=semver
-    default = "8.18.5"
+    default = "8.18.6"
 }
 variable "VIPS_PREV_VERSION" {
     # renovate: datasource=github-releases depName=libvips/libvips-prev versioning=semver
