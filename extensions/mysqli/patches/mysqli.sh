@@ -8,6 +8,22 @@ tests_dir="${php_source_dir}/ext/mysqli/tests"
 # MySQL-specific server behaviour. Every hunk below is written so that it
 # becomes a no-op once php-src ships the same change.
 
+# Add a server version guard to the SKIPIF block of a test that relies on
+# skipifconnectfailure.inc, which leaves no usable connection behind.
+skip_on_server_version() {
+  local test_file="${tests_dir}/$1" min_version="$2" reason="$3"
+
+  if [[ ! -f "${test_file}" ]] || grep -q "${reason}" "${test_file}"; then
+    return 0
+  fi
+
+  sed -i "/require_once 'skipifconnectfailure.inc';/a\\
+\$link = my_mysqli_connect(\$host, \$user, \$passwd, \$db, \$port, \$socket);\\
+if (mysqli_get_server_version(\$link) >= ${min_version})\\
+    die(\"SKIP ${reason}\");\\
+" "${test_file}"
+}
+
 # Backport the PHP 8.5 fix: killing your own connection reports MariaDB's
 # errno 1927 ("Connection was killed") instead of MySQL's 1317 ("Query
 # execution was interrupted"). PHP 8.5 already accepts both codes.
@@ -62,11 +78,11 @@ fi
 
 # MariaDB drops the connection during the TLS handshake instead of reporting a
 # CA loading failure, so neither the warning nor the exception message match.
-test_file="${tests_dir}/gh8978.phpt"
-if [[ -f "${test_file}" ]] && ! grep -q 'Not applicable for MariaDB' "${test_file}"; then
-  sed -i "/require_once 'skipifconnectfailure.inc';/a\\
-\$link = my_mysqli_connect(\$host, \$user, \$passwd, \$db, \$port, \$socket);\\
-if (mysqli_get_server_version(\$link) >= 10_00_00)\\
-    die(\"SKIP Not applicable for MariaDB\");\\
-" "${test_file}"
-fi
+skip_on_server_version gh8978.phpt 10_00_00 'Not applicable for MariaDB'
+
+# On MariaDB 11.x mysqlnd misparses the handshake and leaves 64 bytes of server
+# data in the connection's last message, so mysqli_info() returns that instead
+# of NULL until the first query runs. The test asserts the property against the
+# function on two freshly opened connections and each gets a different value.
+skip_on_server_version mysqli_class_mysqli_interface.phpt 11_00_00 \
+  'Not applicable for MariaDB 11'

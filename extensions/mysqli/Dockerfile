@@ -69,6 +69,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
         mariadb-server \
         mariadb-client
 
+# MariaDB 11.x defaults to the UCA-1400 collations, which mysqlnd's built-in
+# charset table does not know, so field metadata comes back with the wrong
+# collation id and name. Pin the legacy defaults to keep the upstream tests
+# comparable between bookworm (MariaDB 10.11) and trixie (MariaDB 11.8).
+# character_set_collations only exists from 11.5 onwards, hence loose_.
+RUN printf '%s\n' \
+        '[mariadbd]' \
+        'loose_character_set_collations = utf8mb3=utf8mb3_general_ci,utf8mb4=utf8mb4_general_ci' \
+        'collation_server = utf8mb4_general_ci' \
+        > /etc/mysql/mariadb.conf.d/99-php-tests.cnf
+
 RUN --mount=type=bind,from=php-ext-mysqli-build,source=/usr/src/php,target=/src/php,rw \
     --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
