@@ -92,9 +92,13 @@ RUN pecl install igbinary
 
 # TODO: Add sentinel
 RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/php,rw \
+    --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/redis /usr/src/php/ext/redis \
     && cd /usr/src/php/ext/redis \
+    && if [ -f "/usr/src/php-test-patches/redis.sh" ]; then \
+        bash "/usr/src/php-test-patches/redis.sh"; \
+    fi \
     && echo "user default on >phpredis ~* +@all" > tests/users.acl \
     && echo "user phpredis on >phpredis ~* +@all" >> tests/users.acl \
     && echo '#!/bin/bash' > run.sh \
@@ -120,6 +124,8 @@ RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/p
     && echo '    redis-server --port $PORT \\' >> run.sh \
     && echo '        --cluster-enabled yes \\' >> run.sh \
     && echo '        --cluster-config-file "$PORT".conf \\' >> run.sh \
+    && echo '        --masterauth phpredis \\' >> run.sh \
+    && echo '        --logfile "$PORT".log \\' >> run.sh \
     && echo '        --daemonize yes \\' >> run.sh \
     && echo '        --aclfile tests/users.acl \\' >> run.sh \
     && echo '        --acl-pubsub-default allchannels' >> run.sh \
@@ -155,14 +161,28 @@ RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/p
     && echo '    --user phpredis \\' >> run.sh \
     && echo '    -a phpredis || true' >> run.sh \
     && echo >> run.sh \
+    && echo 'i=0' >> run.sh \
+    && echo 'until redis-cli -p 7000 --user phpredis -a phpredis --no-auth-warning cluster info 2>/dev/null | grep -q "cluster_state:ok"; do' >> run.sh \
+    && echo '    echo "Still waiting for the cluster to be ready"' >> run.sh \
+    && echo '    i=$((i+1))' >> run.sh \
+    && echo '    if [ $i -ge 60 ]; then' >> run.sh \
+    && echo '        echo "cluster did not become ready"' >> run.sh \
+    && echo '        exit 1' >> run.sh \
+    && echo '    fi' >> run.sh \
+    && echo '    sleep 1;' >> run.sh \
+    && echo 'done' >> run.sh \
+    && echo >> run.sh \
     && echo 'make test' >> run.sh \
     && echo 'ret=0' >> run.sh \
-    && echo 'TEST_PHP_ARGS="-e" php tests/TestRedis.php --class Redis --user phpredis --auth phpredis' >> run.sh \
-    && echo '[ $? -ne 0 ] && ret=1' >> run.sh \
-    && echo 'TEST_PHP_ARGS="-e" php tests/TestRedis.php --class RedisArray --user phpredis --auth phpredis' >> run.sh \
-    && echo '[ $? -ne 0 ] && ret=1' >> run.sh \
-    && echo 'TEST_PHP_ARGS="-e" php tests/TestRedis.php --class RedisCluster --user phpredis --auth phpredis' >> run.sh \
-    && echo '[ $? -ne 0 ] && ret=1' >> run.sh \
+    && echo 'for CLASS in Redis RedisArray RedisCluster; do' >> run.sh \
+    && echo '    TEST_PHP_ARGS="-e" php tests/TestRedis.php --class "$CLASS" --user phpredis --auth phpredis && continue' >> run.sh \
+    && echo '    ret=1' >> run.sh \
+    && echo '    echo "=== $CLASS failed, cluster node state ==="' >> run.sh \
+    && echo '    for PORT in 7000 7001 7002 7003 7004 7005; do' >> run.sh \
+    && echo '        echo "--- $PORT: $(redis-cli -p "$PORT" --user phpredis -a phpredis --no-auth-warning ping 2>&1 | tail -n1)"' >> run.sh \
+    && echo '        tail -n 20 "$PORT".log 2>/dev/null || true' >> run.sh \
+    && echo '    done' >> run.sh \
+    && echo 'done' >> run.sh \
     && echo 'exit $ret' >> run.sh \
     && chmod +x run.sh
 
