@@ -76,14 +76,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     /usr/src/php-ext-xhprof/install.sh
 
 RUN --mount=type=bind,from=php-ext-xhprof-build,source=/usr/src/php,target=/src/php,rw \
+    --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/xhprof /usr/src/php/ext/xhprof \
     && cd /usr/src/php/ext/xhprof/extension \
+    && if [ -f "/usr/src/php-test-patches/xhprof.sh" ]; then \
+        bash "/usr/src/php-test-patches/xhprof.sh"; \
+    fi \
     && sed -i 's#test: all#test:#' Makefile \
     && cp .libs/xhprof.lai modules/xhprof.la \
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \
-    && echo 'php run-tests.php -j$(nproc) -q' >> run.sh \
+    && echo 'php run-tests.php -j$(nproc) -q --show-diff' >> run.sh \
     && chmod +x run.sh
 
 WORKDIR /usr/src/php/ext/xhprof/extension
