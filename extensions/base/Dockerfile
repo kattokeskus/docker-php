@@ -128,10 +128,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
 
 RUN --mount=type=bind,from=php-ext-build,source=/usr/src/php,target=/src/php,rw \
     --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
-    mkdir -p /usr/src/php/ext \
+    mkdir -p /usr/src/php/ext/openssl \
     && cp -r /src/php/ext/${EXTENSION} /usr/src/php/ext/${EXTENSION} \
     && cp -r /src/php/ext/standard /usr/src/php/ext/standard \
     && cp -r /src/php/ext/dl_test /usr/src/php/ext/dl_test \
+    && cp -r /src/php/ext/openssl/tests /usr/src/php/ext/openssl/tests \
     && cp -r /src/php/sapi /usr/src/php/sapi \
     && cp /src/php/run-tests.php /usr/src/php/run-tests.php \
     && (echo "${EXTENSION}" | grep -qv "^pdo_" || cp -r /src/php/ext/pdo /usr/src/php/ext/pdo) \
