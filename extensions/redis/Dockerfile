@@ -167,6 +167,10 @@ RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/p
     && echo '        echo "--- $PORT: $(redis-cli -p "$PORT" --user phpredis -a phpredis --no-auth-warning ping 2>&1 | tail -n1)"' >> run.sh \
     && echo '        tail -n 20 "$PORT".log 2>/dev/null || true' >> run.sh \
     && echo '    done' >> run.sh \
+    && echo '    echo "=== isolation retry: testFailedTransactions x3 ==="' >> run.sh \
+    && echo '    for i in 1 2 3; do' >> run.sh \
+    && echo '        TEST_PHP_ARGS="-e" php tests/TestRedis.php --class RedisCluster --user phpredis --auth phpredis --test testFailedTransactions 2>&1 | tail -n3' >> run.sh \
+    && echo '    done' >> run.sh \
     && echo 'done' >> run.sh \
     && echo 'exit $ret' >> run.sh \
     && chmod +x run.sh
