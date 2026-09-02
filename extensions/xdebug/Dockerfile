@@ -75,13 +75,11 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \
     && echo 'ret=0' >> run.sh \
-    && echo 'echo "--- control socket probe ---"' >> run.sh \
-    && echo 'php -d xdebug.mode=debug -d xdebug.log=/dev/stdout -d xdebug.log_level=10 -r "usleep(1);" 2>&1 | grep -iE "ctrl|socket" || true' >> run.sh \
-    && echo 'echo "--- end probe ---"' >> run.sh \
     && echo 'php -n \\' >> run.sh \
     && echo '    -d foo=yes \\' >> run.sh \
     && echo '    -d session.save_path=/tmp \\' >> run.sh \
     && echo '    run-xdebug-tests.php -j$(nproc) -q --show-diff \\' >> run.sh \
+    && echo '    -d xdebug.control_socket=time \\' >> run.sh \
     && echo '  || ret=$?' >> run.sh \
     && echo 'php -n \\' >> run.sh \
     && echo '    -d foo=yes \\' >> run.sh \
@@ -90,6 +88,7 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
     && echo '    -d opcache.enable=1 \\' >> run.sh \
     && echo '    -d opcache.enable_cli=1 \\' >> run.sh \
     && echo '    run-xdebug-tests.php -j$(nproc) -q --show-diff \\' >> run.sh \
+    && echo '    -d xdebug.control_socket=time \\' >> run.sh \
     && echo '  && exit $ret' >> run.sh \
     && chmod +x run.sh
 
