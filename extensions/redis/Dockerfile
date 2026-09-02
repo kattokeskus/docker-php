@@ -92,9 +92,13 @@ RUN pecl install igbinary
 
 # TODO: Add sentinel
 RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/php,rw \
+    --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/redis /usr/src/php/ext/redis \
     && cd /usr/src/php/ext/redis \
+    && if [ -f "/usr/src/php-test-patches/redis.sh" ]; then \
+        bash "/usr/src/php-test-patches/redis.sh"; \
+    fi \
     && echo "user default on >phpredis ~* +@all" > tests/users.acl \
     && echo "user phpredis on >phpredis ~* +@all" >> tests/users.acl \
     && echo '#!/bin/bash' > run.sh \
@@ -156,6 +160,17 @@ RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/p
     && echo '    --cluster-replicas 1 \\' >> run.sh \
     && echo '    --user phpredis \\' >> run.sh \
     && echo '    -a phpredis || true' >> run.sh \
+    && echo >> run.sh \
+    && echo 'i=0' >> run.sh \
+    && echo 'until redis-cli -p 7000 --user phpredis -a phpredis --no-auth-warning cluster info 2>/dev/null | grep -q "cluster_state:ok"; do' >> run.sh \
+    && echo '    echo "Still waiting for the cluster to be ready"' >> run.sh \
+    && echo '    i=$((i+1))' >> run.sh \
+    && echo '    if [ $i -ge 60 ]; then' >> run.sh \
+    && echo '        echo "cluster did not become ready"' >> run.sh \
+    && echo '        exit 1' >> run.sh \
+    && echo '    fi' >> run.sh \
+    && echo '    sleep 1;' >> run.sh \
+    && echo 'done' >> run.sh \
     && echo >> run.sh \
     && echo 'make test' >> run.sh \
     && echo 'ret=0' >> run.sh \
