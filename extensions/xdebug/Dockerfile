@@ -68,7 +68,9 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
     && cp -r /src/php/ext/xdebug /usr/src/php/ext/xdebug \
     && cd /usr/src/php/ext/xdebug \
     && curl -sfL "https://github.com/xdebug/xdebug/archive/refs/tags/${XDEBUG_VERSION}.tar.gz" \
-        | tar --strip-components=1 -xzf - xdebug-${XDEBUG_VERSION}/tests \
+        | tar --strip-components=1 -xzf - \
+            xdebug-${XDEBUG_VERSION}/tests \
+            xdebug-${XDEBUG_VERSION}/contrib \
     && cp .libs/xdebug.lai modules/xdebug.la \
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \
@@ -76,7 +78,7 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
     && echo 'php -n \\' >> run.sh \
     && echo '    -d foo=yes \\' >> run.sh \
     && echo '    -d session.save_path=/tmp \\' >> run.sh \
-    && echo '    run-xdebug-tests.php -j$(nproc) -q \\' >> run.sh \
+    && echo '    run-xdebug-tests.php -j$(nproc) -q --show-diff \\' >> run.sh \
     && echo '  || ret=$?' >> run.sh \
     && echo 'php -n \\' >> run.sh \
     && echo '    -d foo=yes \\' >> run.sh \
@@ -84,7 +86,7 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
     && echo '    -d zend_extensions=opcache.so \\' >> run.sh \
     && echo '    -d opcache.enable=1 \\' >> run.sh \
     && echo '    -d opcache.enable_cli=1 \\' >> run.sh \
-    && echo '    run-xdebug-tests.php -j$(nproc) -q \\' >> run.sh \
+    && echo '    run-xdebug-tests.php -j$(nproc) -q --show-diff \\' >> run.sh \
     && echo '  && exit $ret' >> run.sh \
     && chmod +x run.sh
 
