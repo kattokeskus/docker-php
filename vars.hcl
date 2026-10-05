@@ -3,7 +3,7 @@ variable "APCU_VERSION" {
     default = "5.1.28"
 }
 variable "IMAGEMAGICK_VERSION" {
-    # renovate: datasource=github-release depName=ImageMagick/ImageMagick versioning=semver
+    # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=regex:^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)-(?<build>\d+)$
     default = "7.1.1-44"
 }
 variable "IMAGICK_VERSION" {
@@ -27,7 +27,7 @@ variable "VIPS_PREV_VERSION" {
     default = "8.17.3"
 }
 variable "PHP_VIPS_VERSION" {
-    # renovate: datasource=github-releases depName=libvips/php-vips versioning=semver
+    # renovate: datasource=github-tags depName=libvips/php-vips versioning=semver
     default = "2.5.0"
 }
 variable "SPX_VERSION" {
