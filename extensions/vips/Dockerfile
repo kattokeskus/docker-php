@@ -127,11 +127,10 @@ FROM docker.io/composer/composer:2.9.2 AS php-vips-source
 
 ARG PHP_VIPS_VERSION
 
-RUN mkdir -p /usr/src/php-vips \
-    && cd /usr/src \
-    && curl -sfL -o php-vips.tar.gz https://github.com/libvips/php-vips/archive/refs/tags/v${PHP_VIPS_VERSION}.tar.gz \
-    && tar --strip-components=1 -xzf php-vips.tar.gz -C php-vips \
-    && cd php-vips \
+# Tag tarballs omit tests and phpunit.xml (export-ignore)
+RUN git clone --depth 1 --branch v${PHP_VIPS_VERSION} \
+        https://github.com/libvips/php-vips.git /usr/src/php-vips \
+    && cd /usr/src/php-vips \
     && composer install --ignore-platform-reqs
 
 FROM ${PHP_BASE_IMAGE} AS vips-test
