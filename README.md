@@ -28,7 +28,7 @@ RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/${EXTENSION}:${EXT
     /ext/install.sh
 ```
 
-> **Note:** Check [vars-8.3.hcl](vars-8.3.hcl), [vars-8.4.hcl](vars-8.4.hcl), or [vars-8.5.hcl](vars-8.5.hcl) for exact PHP versions as they are updated by Renovate. Build variants are defined in [php-trixie.hcl](php-trixie.hcl) and [php-bookworm.hcl](php-bookworm.hcl).
+> **Note:** Check [vars-8.4.hcl](vars-8.4.hcl) or [vars-8.5.hcl](vars-8.5.hcl) for exact PHP versions as they are updated by Renovate. The build variant is defined in [php-trixie.hcl](php-trixie.hcl).
 
 ## Tag Format
 
@@ -42,17 +42,16 @@ Where:
 - `<extension>` is the extension name (e.g., `redis`, `xdebug`)
 - `<version>` is the extension version (e.g., `6.3.0`, `3.5.0`)
 - `<php-version>` is the PHP version (e.g., `8.4.17`, `8.5.1`)
-- `<variant>` is the PHP image variant (e.g., `bookworm`, `trixie`)
+- `<variant>` is the PHP image variant (`trixie`)
 
 Example:
 ```
-ghcr.io/kattokeskus/docker-php/ext/redis:6.3.0-php8.4.17-bookworm
+ghcr.io/kattokeskus/docker-php/ext/redis:6.3.0-php8.4.17-trixie
 ghcr.io/kattokeskus/docker-php/ext/xdebug:3.5.0-php8.5.1-trixie
 ```
 
 ## Supported PHP Versions
 
-- PHP 8.3
 - PHP 8.4
 - PHP 8.5
 
