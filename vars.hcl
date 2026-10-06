@@ -28,7 +28,7 @@ variable "VIPS_PREV_VERSION" {
 }
 variable "PHP_VIPS_VERSION" {
     # renovate: datasource=github-tags depName=libvips/php-vips versioning=semver
-    default = "2.5.0"
+    default = "2.6.1"
 }
 variable "SPX_VERSION" {
     # renovate: datasource=github-releases depName=NoiseByNorthwest/php-spx versioning=semver
