@@ -18,20 +18,6 @@
     "packageRules": [
         {
             "matchFileNames": [
-                "vars-8.3.hcl"
-            ],
-            "matchDatasources": [
-                "docker"
-            ],
-            "matchPackageNames": [
-                "php",
-                "library/php",
-                "docker.io/library/php"
-            ],
-            "allowedVersions": "<8.4.0"
-        },
-        {
-            "matchFileNames": [
                 "vars-8.4.hcl"
             ],
             "matchDatasources": [
