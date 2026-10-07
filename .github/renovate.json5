@@ -91,6 +91,18 @@
             "matchStrings": [
                 "// renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s+\"allowedVersions\": \"[<>=]?(?<currentValue>[^\"]+)\""
             ]
+        },
+        {
+            "customType": "regex",
+            "managerFilePatterns": [
+                "/^\\.github/workflows/.+\\.ya?ml$/"
+            ],
+            // whole list is replaced, so the -arm entry follows
+            "matchStrings": [
+                "os: \\[ubuntu-(?<currentValue>\\d+\\.\\d+)[^\\]]*\\]"
+            ],
+            "datasourceTemplate": "github-runners",
+            "depNameTemplate": "ubuntu"
         }
     ],
     "customDatasources": {
