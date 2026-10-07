@@ -4,7 +4,7 @@ variable "APCU_VERSION" {
 }
 variable "IMAGEMAGICK_VERSION" {
     # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=regex:^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)-(?<build>\d+)$
-    default = "7.1.1-44"
+    default = "7.1.2-32"
 }
 variable "IMAGICK_VERSION" {
     # renovate: datasource=custom.pecl depName=imagick versioning=semver

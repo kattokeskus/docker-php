@@ -216,6 +216,14 @@ RUN --mount=type=bind,from=php-ext-imagick-build,source=/usr/src/php,target=/src
     && echo 'php run-tests.php -j$(nproc) -q' >> run.sh \
     && chmod +x run.sh
 
+# Lower "not similar" fuzz values for IM 7.1.2 (Imagick/imagick#737)
+RUN sed -i \
+        -e '/rgb(245, 0, 0).*false/s#9 /#7 /#' \
+        -e '/7, 7, 0.*false/s#9 /#6 /#' \
+        -e '/128, 120.*false/s#7 /#5 /#' \
+        -e 's#254\.9,#180,#' \
+        /usr/src/php/ext/imagick/tests/024-ispixelsimilar.phpt
+
 WORKDIR /usr/src/php/ext/imagick
 CMD ["./run.sh"]
 
