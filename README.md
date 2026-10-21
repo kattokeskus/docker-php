@@ -6,6 +6,7 @@ This project provides prebuilt PHP extension images that can be installed into P
 
 - [Using Prebuilt Extensions](#using-prebuilt-extensions)
 - [Tag Format](#tag-format)
+- [PHP-FPM Images](#php-fpm-images)
 - [Supported PHP Versions](#supported-php-versions)
 - [Available Extensions](#available-extensions)
 
@@ -48,6 +49,15 @@ Example:
 ```
 ghcr.io/kattokeskus/docker-php/ext/redis:6.3.0-php8.4.17-trixie
 ghcr.io/kattokeskus/docker-php/ext/xdebug:3.5.0-php8.5.1-trixie
+```
+
+## PHP-FPM Images
+
+PHP-FPM images for the same PHP versions, usable in place of `php:<php-version>-fpm-<variant>`:
+
+```
+ghcr.io/kattokeskus/docker-php/php-fpm:<php-version>-<variant>
+ghcr.io/kattokeskus/docker-php/php-fpm:<minor>-<variant>
 ```
 
 ## Supported PHP Versions
