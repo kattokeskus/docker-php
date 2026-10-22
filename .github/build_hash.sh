@@ -31,7 +31,7 @@ PHP_BAKE="$(PHP_VERSION="${PHP_VERSION}" \
     -f "vars.hcl" \
     -f "vars-${INPUT_PHP_VERSION}.hcl" \
     -f "php-${PHP_VARIANT}.hcl" \
-    php-base php-ext-base 2>/dev/null)"
+    php-base php-ext-base php-fpm 2>/dev/null)"
 
 # Parse context
 context="$(echo "$PHP_BAKE" | jq -r ".target.\"php-base\".context")"

@@ -1,5 +1,8 @@
 variable "PHP_VERSION" {
 }
+# docker-library/php <minor>/<variant> directory to build instead of docker.io/library/php
+variable "PHP_SOURCE" {
+}
 variable "PHP_VARIANT" {
 }
 variable "GCC_VERSION" {
@@ -44,10 +47,18 @@ target "php-version" {
 /************************/
 /* Extension base image */
 /************************/
+target "php-cli-source" {
+    context = "${PHP_SOURCE}/cli"
+    platforms = ["linux/amd64", "linux/arm64"]
+}
+target "php-base-image" {
+    args = PHP_SOURCE == "" ? {} : { PHP_BASE_IMAGE = "php-cli-source" }
+    contexts = PHP_SOURCE == "" ? {} : { php-cli-source = "target:php-cli-source" }
+}
 target "php-base-metadata" {
 }
 target "php-base" {
-    inherits = ["php-version", "php-base-metadata"]
+    inherits = ["php-version", "php-base-image", "php-base-metadata"]
     context = "php"
     platforms = ["linux/amd64", "linux/arm64"]
     target = "base"
@@ -55,10 +66,30 @@ target "php-base" {
 target "php-ext-base-metadata" {
 }
 target "php-ext-base" {
-    inherits = ["php-version", "php-ext-base-metadata"]
+    inherits = ["php-version", "php-base-image", "php-ext-base-metadata"]
     context = "php"
     platforms = ["linux/amd64", "linux/arm64"]
     target = "extension-build-base"
+}
+
+/*****************/
+/* PHP-FPM image */
+/*****************/
+target "php-fpm-source" {
+    context = "${PHP_SOURCE}/fpm"
+    platforms = ["linux/amd64", "linux/arm64"]
+}
+target "php-fpm-metadata" {
+}
+target "php-fpm" {
+    inherits = ["php-version", "php-fpm-metadata"]
+    context = "php"
+    platforms = ["linux/amd64", "linux/arm64"]
+    target = "base"
+    args = {
+        PHP_BASE_IMAGE = PHP_SOURCE == "" ? "docker.io/library/php:${PHP_VERSION}-fpm-${PHP_VARIANT}" : "php-fpm-source"
+    }
+    contexts = PHP_SOURCE == "" ? {} : { php-fpm-source = "target:php-fpm-source" }
 }
 
 /********************/

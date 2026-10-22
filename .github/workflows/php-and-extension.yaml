@@ -296,6 +296,24 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
           bake-target: php-ext-base-metadata
+      - name: Docker metadata for php-fpm
+        id: metadata-php-fpm
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}/php-fpm-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          tags: |
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PHP FPM ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          annotations: |
+            org.opencontainers.image.title=PHP FPM ${{ inputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.php-version.outputs.php-version }}
+          bake-target: php-fpm-metadata
       - name: Build PHP base images
         uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         env:
@@ -311,6 +329,8 @@ jobs:
             cwd://${{ steps.metadata-php-base.outputs.bake-file-annotations }}
             cwd://${{ steps.metadata-php-ext-base.outputs.bake-file-tags }}
             cwd://${{ steps.metadata-php-ext-base.outputs.bake-file-annotations }}
+            cwd://${{ steps.metadata-php-fpm.outputs.bake-file-tags }}
+            cwd://${{ steps.metadata-php-fpm.outputs.bake-file-annotations }}
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
@@ -320,7 +340,10 @@ jobs:
             php-ext-base.output=type=oci,dest=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-ext-base.cache-from=type=gha,scope=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
             php-ext-base.cache-to=type=gha,scope=php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
-          targets: php-base,php-ext-base
+            php-fpm.output=type=oci,dest=php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+            php-fpm.cache-from=type=gha,scope=php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+            php-fpm.cache-to=type=gha,scope=php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
+          targets: php-base,php-ext-base,php-fpm
           github-token: ${{ github.token }}
       - name: Add platform to manifests
         env:
@@ -330,7 +353,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          IMAGES=(php-base php-ext-base)
+          IMAGES=(php-base php-ext-base php-fpm)
 
           for image in "${IMAGES[@]}"
           do
@@ -362,6 +385,11 @@ jobs:
         with:
           name: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
           path: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+      - name: Upload php-fpm artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
 
   merge-base-images:
     needs: [php-version, build-base-images]
@@ -383,6 +411,11 @@ jobs:
         with:
           pattern: php-ext-base-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
           merge-multiple: true
+      - name: Download php-fpm artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: php-fpm-${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          merge-multiple: true
       - name: Login to Github Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -401,7 +434,7 @@ jobs:
 
           ARCHS=(amd64 arm64)
 
-          IMAGES=(php-base php-ext-base)
+          IMAGES=(php-base php-ext-base php-fpm)
 
           # Check artifacts exists
           for image in "${IMAGES[@]}"
@@ -448,7 +481,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          IMAGES=(php-base php-ext-base)
+          IMAGES=(php-base php-ext-base php-fpm)
 
           # Check artifacts exists
           for image in "${IMAGES[@]}"
