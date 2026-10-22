@@ -1,0 +1,40 @@
+name: Delete images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'PHP version and variant: 8.3-bookworm deletes all 8.3 bookworm images, 8.5.11-trixie deletes 8.5.0 to 8.5.11 trixie images'
+        required: true
+        type: string
+      dry-run:
+        description: Only list the versions to delete
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  delete-images:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/delete_images.sh
+          sparse-checkout-cone-mode: false
+      - name: Delete images
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry-run && '1' || '0' }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: ./.github/delete_images.sh "$VERSION"
