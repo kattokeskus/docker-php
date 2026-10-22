@@ -1,6 +1,7 @@
 variable "PHP_VERSION" {
 }
-# docker-library/php <minor>/<variant> directory to build instead of docker.io/library/php
+# docker-library/php <minor>/<variant> directory to build instead of docker.io/library/php,
+# set in vars-<minor>.hcl, e.g. "https://github.com/docker-library/php.git#<commit>:8.5/${PHP_VARIANT}"
 variable "PHP_SOURCE" {
 }
 variable "PHP_VARIANT" {
