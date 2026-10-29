@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null
+cd "$SCRIPT_DIR/.."
+
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <php-version>-<variant>" >&2
     exit 1
@@ -54,14 +57,17 @@ wait_rate_limit() {
 }
 
 delete() {
-    local output
+    local output tries=0
     while ! output="$(gh api --method DELETE "$1" 2>&1)"; do
-        if [[ "$output" != *"rate limit"* ]]; then
+        if [[ "$output" == *"rate limit"* ]]; then
+            # Secondary rate limits don't tell when they reset
+            wait_rate_limit 1 || sleep 60
+        elif [[ "$output" == *"(HTTP 5"* ]] && (( ++tries < 5 )); then
+            sleep 10
+        else
             echo "$1: $output" >&2
             return 1
         fi
-        # Secondary rate limits don't tell when they reset
-        wait_rate_limit 1 || sleep 60
     done
     # GitHub asks for a second between mutating requests
     sleep 1
@@ -70,8 +76,12 @@ delete() {
 failed=0
 matched=0
 deleted=0
-packages="$(gh api --paginate "/orgs/${OWNER}/packages?package_type=container&per_page=100" \
-    | jq -s -r --arg repo "$GITHUB_REPOSITORY" 'add | .[] | select(.repository.full_name == $repo) | .name')"
+# GITHUB_TOKEN can't list the organization's packages, so the extension
+# packages are named as in php-and-extension.yaml
+repo="${GITHUB_REPOSITORY#*/}"
+packages="${repo}/php-base ${repo}/php-ext-base ${repo}/php-fpm $(docker buildx bake --print -f docker-bake.hcl extensions \
+    | jq -r --arg repo "$repo" '. as $bake | [.group.extensions.targets[]
+        | "\($repo)/ext/\($bake.target[.].args.EXTENSION // sub("^php-ext-"; ""))"] | unique | join(" ")')"
 
 for PACKAGE in $packages; do
     export PACKAGE
@@ -81,10 +91,16 @@ for PACKAGE in $packages; do
     package_uri="$(jq -rn --arg p "$PACKAGE" '$p | @uri')"
     wait_rate_limit 50 || true
 
+    if ! versions="$(gh api --paginate "/orgs/${OWNER}/packages/container/${package_uri}/versions?per_page=100")"; then
+        echo "${PACKAGE}: failed to list versions" >&2
+        failed=1
+        continue
+    fi
+
     # build-<hash>[-<arch>] versions are grouped by hash, others by digest.
     # Tags give the PHP version: 8.5.12-trixie, 6.3.0-php8.5.12-trixie,
     # php8.5-trixie, 8.4.14-trixie-amd64. Groups without such tags are probed.
-    versions="$(gh api --paginate "/orgs/${OWNER}/packages/container/${package_uri}/versions?per_page=100" \
+    versions="$(echo "$versions" \
         | jq -s 'add | map(.metadata.container.tags as $tags | {
             id,
             digest: .name,
