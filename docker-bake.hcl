@@ -6,6 +6,15 @@ variable "PHP_SOURCE" {
 }
 variable "PHP_VARIANT" {
 }
+# nts builds on docker.io/library/php:<version>-<variant>, zts on the thread
+# safe docker.io/library/php:<version>-zts-<variant>. There is no zts php-fpm.
+variable "PHP_THREAD_SAFETY" {
+    default = "nts"
+    validation {
+        condition = PHP_THREAD_SAFETY == "nts" || PHP_THREAD_SAFETY == "zts"
+        error_message = "PHP_THREAD_SAFETY must be nts or zts."
+    }
+}
 variable "GCC_VERSION" {
 }
 variable "VIPS_HEIF_DEPS" {
@@ -49,11 +58,14 @@ target "php-version" {
 /* Extension base image */
 /************************/
 target "php-cli-source" {
-    context = "${PHP_SOURCE}/cli"
+    context = PHP_THREAD_SAFETY == "zts" ? "${PHP_SOURCE}/zts" : "${PHP_SOURCE}/cli"
     platforms = ["linux/amd64", "linux/arm64"]
 }
+# nts adds no arguments so that its build hashes stay the same
 target "php-base-image" {
-    args = PHP_SOURCE == "" ? {} : { PHP_BASE_IMAGE = "php-cli-source" }
+    args = (PHP_SOURCE != "" ? { PHP_BASE_IMAGE = "php-cli-source" }
+        : PHP_THREAD_SAFETY == "zts" ? { PHP_BASE_IMAGE = "docker.io/library/php:${PHP_VERSION}-zts-${PHP_VARIANT}" }
+        : {})
     contexts = PHP_SOURCE == "" ? {} : { php-cli-source = "target:php-cli-source" }
 }
 target "php-base-metadata" {

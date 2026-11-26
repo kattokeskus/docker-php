@@ -64,6 +64,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
 
 ARG XDEBUG_VERSION
 RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/php,rw \
+    --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/xdebug /usr/src/php/ext/xdebug \
     && cd /usr/src/php/ext/xdebug \
@@ -71,6 +72,9 @@ RUN --mount=type=bind,from=php-ext-xdebug-build,source=/usr/src/php,target=/src/
         | tar --strip-components=1 -xzf - \
             xdebug-${XDEBUG_VERSION}/tests \
             xdebug-${XDEBUG_VERSION}/contrib \
+    && if [ -f "/usr/src/php-test-patches/xdebug.sh" ]; then \
+        bash "/usr/src/php-test-patches/xdebug.sh"; \
+    fi \
     && cp .libs/xdebug.lai modules/xdebug.la \
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \

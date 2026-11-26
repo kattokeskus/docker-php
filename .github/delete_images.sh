@@ -1,7 +1,7 @@
 #!/bin/bash
-# Deletes the container package versions of a PHP version and variant.
-# 8.3-bookworm deletes all 8.3 bookworm images. 8.5.11-trixie deletes 8.5.0 to
-# 8.5.11 trixie images but keeps the image tagged 8.5-trixie.
+# Deletes the container package versions of a PHP version and variant, both
+# nts and zts. 8.3-bookworm deletes all 8.3 bookworm images. 8.5.11-trixie
+# deletes 8.5.0 to 8.5.11 trixie images but keeps the image tagged 8.5-trixie.
 
 set -euo pipefail
 
@@ -99,14 +99,15 @@ for PACKAGE in $packages; do
 
     # build-<hash>[-<arch>] versions are grouped by hash, others by digest.
     # Tags give the PHP version: 8.5.12-trixie, 6.3.0-php8.5.12-trixie,
-    # php8.5-trixie, 8.4.14-trixie-amd64. Groups without such tags are probed.
+    # php8.5-trixie, 8.4.14-trixie-amd64, with an optional -nts or -zts
+    # suffix before the architecture. Groups without such tags are probed.
     versions="$(echo "$versions" \
         | jq -s 'add | map(.metadata.container.tags as $tags | {
             id,
             digest: .name,
             arch: any($tags[]; test("-(amd64|arm64)$")),
             key: ([$tags[] | capture("^build-(?<h>[0-9a-f]+)(-(amd64|arm64))?$").h][0] // .name),
-            classes: [$tags[] | capture("(^|php)(?<minor>[0-9]+\\.[0-9]+)(\\.(?<patch>[0-9]+))?-(?<variant>[a-z]+)(-(amd64|arm64))?$")
+            classes: [$tags[] | capture("(^|php)(?<minor>[0-9]+\\.[0-9]+)(\\.(?<patch>[0-9]+))?-(?<variant>[a-z]+)(-(nts|zts))?(-(amd64|arm64))?$")
                 | {minor, patch: (.patch | if . then tonumber else null end), variant}]
         })')"
     groups="$(echo "$versions" | jq 'group_by(.key) | map({

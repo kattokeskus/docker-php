@@ -15,6 +15,10 @@ on:
         type: string
         description: The PHP variant
         required: true
+      php-thread-safety:
+        type: string
+        description: The PHP thread safety, nts or zts
+        required: true
       extensions:
         type: string
         description: Extensions as json array
@@ -44,6 +48,7 @@ jobs:
     with:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
+      php-thread-safety: ${{ inputs.php-thread-safety }}
       extension: ${{ matrix.extension }} 
       base-tag-name: ${{ inputs.base-tag-name }} 
       build: ${{ contains(fromJSON(inputs.extensions-to-build), matrix.extension) && '1' || '0' }}

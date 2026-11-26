@@ -6,13 +6,25 @@ SCRIPT_DIR="$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null
 cd "$SCRIPT_DIR/.."
 
 if [[ $# -lt 2 ]]; then
-    echo "Usage: $0 <php-version> <php-variant> [<extension>]"
+    echo "Usage: [PHP_THREAD_SAFETY=nts|zts] $0 <php-version> <php-variant> [<extension>]"
     exit 1
 fi
 
 INPUT_PHP_VERSION="$1"
 PHP_VARIANT="$2"
 EXTENSION="${3:-}"
+export PHP_THREAD_SAFETY="${PHP_THREAD_SAFETY:-nts}"
+
+# There is no zts php-fpm
+BASE_TARGETS=(php-base php-ext-base)
+case "$PHP_THREAD_SAFETY" in
+    nts) BASE_TARGETS+=(php-fpm) ;;
+    zts) ;;
+    *)
+        echo "Invalid PHP_THREAD_SAFETY: ${PHP_THREAD_SAFETY}"
+        exit 1
+        ;;
+esac
 
 if [ ! -f "vars-${INPUT_PHP_VERSION}.hcl" ]; then
     echo "vars-${INPUT_PHP_VERSION}.hcl not found"
@@ -31,7 +43,7 @@ PHP_BAKE="$(PHP_VERSION="${PHP_VERSION}" \
     -f "vars.hcl" \
     -f "vars-${INPUT_PHP_VERSION}.hcl" \
     -f "php-${PHP_VARIANT}.hcl" \
-    php-base php-ext-base php-fpm 2>/dev/null)"
+    "${BASE_TARGETS[@]}" 2>/dev/null)"
 
 # Parse context
 context="$(echo "$PHP_BAKE" | jq -r ".target.\"php-base\".context")"
