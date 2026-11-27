@@ -61,7 +61,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo "if php -m | grep -q \"^${MODULE}$\"; then" \
+        && echo "if php -m | grep \"^${MODULE}$\" > /dev/null; then" \
         && echo '  if [ "${REINSTALL:-0}" -eq 1 ]; then' \
         && echo "    echo \"warning: ${MODULE} already active\" >&2" \
         && echo '  else' \

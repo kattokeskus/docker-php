@@ -26,7 +26,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo 'if php -m | grep -q "^mysqli$"; then' \
+        && echo 'if php -m | grep "^mysqli$" > /dev/null; then' \
         && echo '  echo "mysqli already active"' \
         && echo '  exit 1' \
         && echo 'fi' \
@@ -37,7 +37,7 @@ RUN mkdir -p /install/php-ext \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable mysqli' \
-        && echo 'php -m | grep -q "^mysqli$"' \
+        && echo 'php -m | grep "^mysqli$" > /dev/null' \
     ) > /install/install.sh \
     && chmod +x /install/install.sh \
     && cp /usr/local/lib/php/extensions/*/mysqli.so \

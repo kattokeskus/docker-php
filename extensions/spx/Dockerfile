@@ -38,7 +38,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo 'if php -m | grep -q "^SPX$"; then' \
+        && echo 'if php -m | grep "^SPX$" > /dev/null; then' \
         && echo '  echo "spx already active"' \
         && echo '  exit 1' \
         && echo 'fi' \

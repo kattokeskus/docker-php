@@ -32,7 +32,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo 'if php -m | grep -q "^gettext$"; then' \
+        && echo 'if php -m | grep "^gettext$" > /dev/null; then' \
         && echo '  echo "gettext already active"' \
         && echo '  exit 1' \
         && echo 'fi' \
@@ -61,7 +61,7 @@ RUN mkdir -p /install/php-ext \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable gettext' \
-        && echo 'php -m | grep -q "^gettext$"' \
+        && echo 'php -m | grep "^gettext$" > /dev/null' \
     ) > /install/install.sh \
     && chmod +x /install/install.sh \
     && cp /usr/local/lib/php/extensions/*/gettext.so \
