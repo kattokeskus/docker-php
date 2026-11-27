@@ -15,6 +15,10 @@ on:
         type: string
         description: The PHP variant
         required: true
+      php-thread-safety:
+        type: string
+        description: The PHP thread safety, nts or zts
+        required: true
       extension:
         type: string
         description: The extension
@@ -31,6 +35,12 @@ on:
         type: string
         description: Build hash
         required: true
+
+env:
+  # Read by docker-bake.hcl
+  PHP_THREAD_SAFETY: ${{ inputs.php-thread-safety }}
+  # Variant in image names: trixie for nts, trixie-zts for zts
+  IMAGE_VARIANT: ${{ inputs.php-thread-safety == 'zts' && format('{0}-zts', inputs.php-variant) || inputs.php-variant }}
 
 jobs:
   extension-version:
@@ -97,15 +107,15 @@ jobs:
           tags: |
             type=sha
           labels: |
-            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ needs.extension-version.outputs.image-extension }}
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ env.IMAGE_VARIANT }} Extension ${{ needs.extension-version.outputs.image-extension }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ env.IMAGE_VARIANT }}
           annotations: |
-            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }} Extension ${{ needs.extension-version.outputs.image-extension }}
+            org.opencontainers.image.title=PHP ${{ needs.extension-version.outputs.php-version }}-${{ env.IMAGE_VARIANT }} Extension ${{ needs.extension-version.outputs.image-extension }}
             org.opencontainers.image.description=
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ inputs.php-variant }}
+            org.opencontainers.image.version=${{ needs.extension-version.outputs.ext-version }}-php${{ needs.extension-version.outputs.php-version }}-${{ env.IMAGE_VARIANT }}
           bake-target: php-ext-${{ inputs.extension }}-metadata
       - name: Login to Github Container Registry
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -134,11 +144,11 @@ jobs:
           pull: true
           set: |
             *.platform=${{ contains(matrix.os, 'arm') && 'linux/arm64' || 'linux/amd64' }}
-            php-ext-${{ inputs.extension }}.output=type=oci,dest=php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+            php-ext-${{ inputs.extension }}.output=type=oci,dest=php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
             php-ext-${{ inputs.extension }}-test.output=type=docker
-            php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
-            php-ext-${{ inputs.extension }}.cache-from=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
-            php-ext-${{ inputs.extension }}.cache-to=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
+            php-ext-${{ inputs.extension }}-test.tags=localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
+            php-ext-${{ inputs.extension }}.cache-from=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+            php-ext-${{ inputs.extension }}.cache-to=type=gha,scope=ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }},mode=max
             php-ext-${{ inputs.extension }}.contexts.php-base=docker-image://ghcr.io/${{ github.repository }}/php-base:${{ inputs.base-tag-name }}
             php-ext-${{ inputs.extension }}.contexts.php-ext-base=docker-image://ghcr.io/${{ github.repository }}/php-ext-base:${{ inputs.base-tag-name }}
           targets: php-ext-${{ inputs.extension }},php-ext-${{ inputs.extension }}-test
@@ -147,7 +157,7 @@ jobs:
         id: test-extension
         continue-on-error: true
         env:
-          TEST_IMAGE: localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
+          TEST_IMAGE: localhost/php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test
         run: |
           set -euo pipefail
 
@@ -158,13 +168,13 @@ jobs:
         if: steps.test-extension.outcome == 'failure'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test-result
+          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-test-result
           path: test-result.log
       - name: Upload PHP extension artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
-          path: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
+          name: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}
+          path: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}.tar
       - name: Break on test failure
         if: steps.test-extension.outcome == 'failure'
         run: |
@@ -185,7 +195,7 @@ jobs:
       - name: Download PHP extension artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ inputs.php-variant }}-*
+          pattern: php-ext-${{ inputs.extension }}-php${{ inputs.php-version }}-${{ env.IMAGE_VARIANT }}-*
           merge-multiple: true
       - name: Login to Github Container Registry
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -197,7 +207,6 @@ jobs:
         env:
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VERSION: ${{ needs.extension-version.outputs.php-version }}
-          PHP_VARIANT: ${{ inputs.php-variant }}
           EXTENSION: ${{ inputs.extension }}
           IMAGE_EXTENSION: ${{ needs.extension-version.outputs.image-extension }}
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
@@ -211,7 +220,7 @@ jobs:
           tags=()
           for arch in "${ARCHS[@]}"
           do
-            archive="php-ext-${EXTENSION}-php${INPUT_PHP_VERSION}-${PHP_VARIANT}-${arch}.tar"
+            archive="php-ext-${EXTENSION}-php${INPUT_PHP_VERSION}-${IMAGE_VARIANT}-${arch}.tar"
             if [[ ! -f "$archive" ]]; then
               echo "$archive does not exist" >&2
               exit 1
@@ -254,14 +263,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:${EXTENSION_VERSION}-php${PHP_VERSION}-${PHP_VARIANT}"
+          # nts images also keep the tags without a suffix
+          suffixes=("-${PHP_THREAD_SAFETY}")
+          if [[ "$PHP_THREAD_SAFETY" == "nts" ]]; then
+            suffixes=("" "-nts")
+          fi
 
-          docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:php${PHP_VERSION}-${PHP_VARIANT}"
-
-          docker buildx imagetools create \
-            "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
-            --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:php${INPUT_PHP_VERSION}-${PHP_VARIANT}"
+          # The last tag is the one php-and-extension.yaml checks
+          for suffix in "${suffixes[@]}"
+          do
+            for tag in "php${INPUT_PHP_VERSION}" "php${PHP_VERSION}" "${EXTENSION_VERSION}-php${PHP_VERSION}"
+            do
+              docker buildx imagetools create \
+                "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:build-${BUILD_HASH}" \
+                --tag "ghcr.io/${GITHUB_REPOSITORY}/ext/${IMAGE_EXTENSION}:${tag}-${PHP_VARIANT}${suffix}"
+            done
+          done
