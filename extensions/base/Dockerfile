@@ -136,6 +136,11 @@ RUN --mount=type=bind,from=php-ext-build,source=/usr/src/php,target=/src/php,rw 
     && cp -r /src/php/sapi /usr/src/php/sapi \
     && cp /src/php/run-tests.php /usr/src/php/run-tests.php \
     && (echo "${EXTENSION}" | grep -qv "^pdo_" || cp -r /src/php/ext/pdo /usr/src/php/ext/pdo) \
+    # PHP 8.6+ SKIPIF helpers share connection probes through tests/probe_cache.inc
+    && if [ -f /src/php/tests/probe_cache.inc ]; then \
+        mkdir -p /usr/src/php/tests \
+        && cp /src/php/tests/probe_cache.inc /usr/src/php/tests/probe_cache.inc; \
+    fi \
     && cd /usr/src/php/ext/${EXTENSION} \
     && if [ -f "/usr/src/php-test-patches/${EXTENSION}.sh" ]; then \
         bash "/usr/src/php-test-patches/${EXTENSION}.sh"; \

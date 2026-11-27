@@ -146,15 +146,20 @@ RUN TARGETARCH=${TARGETARCH} \
     BUILDARCH=${BUILDARCH} \
     /install/install.sh
 
+# IMAGICK_VERSION is a PECL release, or a git commit when no release supports the PHP version
 ARG IMAGICK_VERSION
-RUN mkdir -p /usr/src/php/ext \
+RUN mkdir -p /usr/src/php/ext/imagick \
     && cd /usr/src/php/ext \
-    && curl -sfL -o imagick-${IMAGICK_VERSION}.tgz https://pecl.php.net/get/imagick-${IMAGICK_VERSION}.tgz \
-    && tar xzf imagick-${IMAGICK_VERSION}.tgz \
-    && rm imagick-${IMAGICK_VERSION}.tgz \
-    && mv imagick-${IMAGICK_VERSION} imagick
+    && (curl -sfL -o imagick-${IMAGICK_VERSION}.tgz https://pecl.php.net/get/imagick-${IMAGICK_VERSION}.tgz \
+        || curl -sfL -o imagick-${IMAGICK_VERSION}.tgz https://github.com/Imagick/imagick/archive/${IMAGICK_VERSION}.tar.gz) \
+    && tar --strip-components=1 -xzf imagick-${IMAGICK_VERSION}.tgz -C imagick \
+    && rm imagick-${IMAGICK_VERSION}.tgz
 
-RUN cd /usr/src/php/ext/imagick \
+# PHP 8.6+ phpize ships libtool 2.5, which links every library in the
+# dependency_libs of ImageMagick's .la files and so needs the -dev package of
+# each delegate. Drop the .la files to link against the shared libraries only.
+RUN rm -f /usr/local/lib/libMagick*.la \
+    && cd /usr/src/php/ext/imagick \
     && phpize \
     && ./configure \
     --build `echo ${BUILDARCH} | sed -e 's#arm64#aarch64#' -e 's#amd64#x86_64#'`-none-linux \

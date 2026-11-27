@@ -8,13 +8,14 @@ ARG TARGETARCH
 ARG BUILDARCH
 ARG GCC_VERSION=14
 
+# APCU_VERSION is a PECL release, or a git commit when no release supports the PHP version
 ARG APCU_VERSION
-RUN mkdir -p /usr/src/php/ext \
+RUN mkdir -p /usr/src/php/ext/apcu \
     && cd /usr/src/php/ext \
-    && curl -sfL -o apcu-${APCU_VERSION}.tgz https://pecl.php.net/get/apcu-${APCU_VERSION}.tgz \
-    && tar -xzf apcu-${APCU_VERSION}.tgz \
-    && rm apcu-${APCU_VERSION}.tgz \
-    && mv apcu-${APCU_VERSION} apcu
+    && (curl -sfL -o apcu-${APCU_VERSION}.tgz https://pecl.php.net/get/apcu-${APCU_VERSION}.tgz \
+        || curl -sfL -o apcu-${APCU_VERSION}.tgz https://github.com/krakjoe/apcu/archive/${APCU_VERSION}.tar.gz) \
+    && tar --strip-components=1 -xzf apcu-${APCU_VERSION}.tgz -C apcu \
+    && rm apcu-${APCU_VERSION}.tgz
 
 RUN cd /usr/src/php/ext/apcu \
     && phpize \

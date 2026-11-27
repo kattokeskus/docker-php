@@ -82,6 +82,11 @@ RUN --mount=type=bind,from=php-ext-mysqli-build,source=/usr/src/php,target=/src/
     --mount=type=bind,source=patches,target=/usr/src/php-test-patches \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/mysqli /usr/src/php/ext/mysqli \
+    # PHP 8.6+ SKIPIF helpers share connection probes through tests/probe_cache.inc
+    && if [ -f /src/php/tests/probe_cache.inc ]; then \
+        mkdir -p /usr/src/php/tests \
+        && cp /src/php/tests/probe_cache.inc /usr/src/php/tests/probe_cache.inc; \
+    fi \
     && cd /usr/src/php/ext/mysqli \
     && if [ -f "/usr/src/php-test-patches/mysqli.sh" ]; then \
         bash "/usr/src/php-test-patches/mysqli.sh"; \

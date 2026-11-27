@@ -7,12 +7,13 @@ ARG TARGETARCH
 ARG BUILDARCH
 ARG GCC_VERSION=14
 
+# XDEBUG_VERSION is a PECL release, or a git tag that is not published on PECL
 ARG XDEBUG_VERSION
-RUN mkdir -p /usr/src/php/ext \
+RUN mkdir -p /usr/src/php/ext/xdebug \
     && cd /usr/src/php/ext \
-    && curl -sfL -o xdebug-${XDEBUG_VERSION}.tgz https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz \
-    && tar -xzf xdebug-${XDEBUG_VERSION}.tgz \
-    && mv xdebug-${XDEBUG_VERSION} xdebug \
+    && (curl -sfL -o xdebug-${XDEBUG_VERSION}.tgz https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz \
+        || curl -sfL -o xdebug-${XDEBUG_VERSION}.tgz https://github.com/xdebug/xdebug/archive/refs/tags/${XDEBUG_VERSION}.tar.gz) \
+    && tar --strip-components=1 -xzf xdebug-${XDEBUG_VERSION}.tgz -C xdebug \
     && rm xdebug-${XDEBUG_VERSION}.tgz
 
 RUN cd /usr/src/php/ext/xdebug \

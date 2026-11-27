@@ -19,6 +19,10 @@ on:
         type: string
         description: The PHP thread safety, nts or zts
         required: true
+      php-default-thread-safety:
+        type: string
+        description: The thread safety of the default official images, nts or zts
+        required: true
       extension:
         type: string
         description: The extension
@@ -39,8 +43,9 @@ on:
 env:
   # Read by docker-bake.hcl
   PHP_THREAD_SAFETY: ${{ inputs.php-thread-safety }}
-  # Variant in image names: trixie for nts, trixie-zts for zts
-  IMAGE_VARIANT: ${{ inputs.php-thread-safety == 'zts' && format('{0}-zts', inputs.php-variant) || inputs.php-variant }}
+  # Variant in image names: trixie for the default thread safety, trixie-nts or
+  # trixie-zts for the other one
+  IMAGE_VARIANT: ${{ inputs.php-thread-safety == inputs.php-default-thread-safety && inputs.php-variant || format('{0}-{1}', inputs.php-variant, inputs.php-thread-safety) }}
 
 jobs:
   extension-version:
@@ -66,7 +71,9 @@ jobs:
           echo "php-version=${PHP_VERSION}" >> "$GITHUB_OUTPUT"
 
           ext_version_var=$(echo "$EXTENSION" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
-          ext_version="$(./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
+          # vars-<minor>.hcl may override the extension version from vars.hcl
+          ext_version="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" "$ext_version_var" 2>/dev/null \
+            || ./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
           if [[ -z "$ext_version" ]]; then
             echo "ext-version=${PHP_VERSION}" >> "$GITHUB_OUTPUT"
             echo "ext-version-var=PHP_EXT_VERSION" >> "$GITHUB_OUTPUT"
@@ -260,13 +267,14 @@ jobs:
           EXTENSION_VERSION: ${{ needs.extension-version.outputs.ext-version }}
           BUILD_HASH: ${{ inputs.build-hash }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          PHP_DEFAULT_THREAD_SAFETY: ${{ inputs.php-default-thread-safety }}
         run: |
           set -euo pipefail
 
-          # nts images also keep the tags without a suffix
+          # Images with the default thread safety also get the tags without a suffix
           suffixes=("-${PHP_THREAD_SAFETY}")
-          if [[ "$PHP_THREAD_SAFETY" == "nts" ]]; then
-            suffixes=("" "-nts")
+          if [[ "$PHP_THREAD_SAFETY" == "$PHP_DEFAULT_THREAD_SAFETY" ]]; then
+            suffixes=("" "-${PHP_THREAD_SAFETY}")
           fi
 
           # The last tag is the one php-and-extension.yaml checks

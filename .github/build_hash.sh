@@ -15,11 +15,8 @@ PHP_VARIANT="$2"
 EXTENSION="${3:-}"
 export PHP_THREAD_SAFETY="${PHP_THREAD_SAFETY:-nts}"
 
-# There is no zts php-fpm
-BASE_TARGETS=(php-base php-ext-base)
 case "$PHP_THREAD_SAFETY" in
-    nts) BASE_TARGETS+=(php-fpm) ;;
-    zts) ;;
+    nts|zts) ;;
     *)
         echo "Invalid PHP_THREAD_SAFETY: ${PHP_THREAD_SAFETY}"
         exit 1
@@ -29,6 +26,14 @@ esac
 if [ ! -f "vars-${INPUT_PHP_VERSION}.hcl" ]; then
     echo "vars-${INPUT_PHP_VERSION}.hcl not found"
     exit 1
+fi
+
+# php-fpm builds on the official php-fpm image, which has the default thread
+# safety only: nts unless vars-<minor>.hcl sets PHP_DEFAULT_THREAD_SAFETY
+PHP_DEFAULT_THREAD_SAFETY="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_DEFAULT_THREAD_SAFETY 2>/dev/null || true)"
+BASE_TARGETS=(php-base php-ext-base)
+if [[ "$PHP_THREAD_SAFETY" == "${PHP_DEFAULT_THREAD_SAFETY:-nts}" ]]; then
+    BASE_TARGETS+=(php-fpm)
 fi
 if [ ! -f "php-${PHP_VARIANT}.hcl" ]; then
     echo "php-${PHP_VARIANT}.hcl not found"
@@ -76,7 +81,9 @@ if [[ -z "$EXTENSION" ]]; then
 fi
 
 ext_version_var=$(echo "$EXTENSION" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
-ext_version="$(./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
+# vars-<minor>.hcl may override the extension version from vars.hcl
+ext_version="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" $ext_version_var 2>/dev/null \
+    || ./.github/hcl_get_variable.sh vars.hcl $ext_version_var 2>/dev/null || true)"
 if [[ -z "$ext_version" ]]; then
     ext_version_var="PHP_VERSION"
     ext_version="${PHP_VERSION}"

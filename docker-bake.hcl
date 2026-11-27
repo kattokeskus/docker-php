@@ -6,13 +6,24 @@ variable "PHP_SOURCE" {
 }
 variable "PHP_VARIANT" {
 }
-# nts builds on docker.io/library/php:<version>-<variant>, zts on the thread
-# safe docker.io/library/php:<version>-zts-<variant>. There is no zts php-fpm.
+# The default thread safety builds on docker.io/library/php:<version>-<variant>,
+# the other one on docker.io/library/php:<version>-<nts|zts>-<variant>. The
+# official php-fpm image, and so php-fpm, has the default thread safety only.
 variable "PHP_THREAD_SAFETY" {
     default = "nts"
     validation {
         condition = PHP_THREAD_SAFETY == "nts" || PHP_THREAD_SAFETY == "zts"
         error_message = "PHP_THREAD_SAFETY must be nts or zts."
+    }
+}
+# The thread safety of the default official images, set in vars-<minor>.hcl:
+# nts up to PHP 8.5, zts from PHP 8.6. Its images are also tagged without the
+# thread safety suffix.
+variable "PHP_DEFAULT_THREAD_SAFETY" {
+    default = "nts"
+    validation {
+        condition = PHP_DEFAULT_THREAD_SAFETY == "nts" || PHP_DEFAULT_THREAD_SAFETY == "zts"
+        error_message = "PHP_DEFAULT_THREAD_SAFETY must be nts or zts."
     }
 }
 variable "GCC_VERSION" {
@@ -57,14 +68,16 @@ target "php-version" {
 /************************/
 /* Extension base image */
 /************************/
+# docker-library/php builds the default thread safety in cli and the other one
+# in nts or zts
 target "php-cli-source" {
-    context = PHP_THREAD_SAFETY == "zts" ? "${PHP_SOURCE}/zts" : "${PHP_SOURCE}/cli"
+    context = PHP_THREAD_SAFETY == PHP_DEFAULT_THREAD_SAFETY ? "${PHP_SOURCE}/cli" : "${PHP_SOURCE}/${PHP_THREAD_SAFETY}"
     platforms = ["linux/amd64", "linux/arm64"]
 }
-# nts adds no arguments so that its build hashes stay the same
+# The default thread safety adds no arguments so that its build hashes stay the same
 target "php-base-image" {
     args = (PHP_SOURCE != "" ? { PHP_BASE_IMAGE = "php-cli-source" }
-        : PHP_THREAD_SAFETY == "zts" ? { PHP_BASE_IMAGE = "docker.io/library/php:${PHP_VERSION}-zts-${PHP_VARIANT}" }
+        : PHP_THREAD_SAFETY != PHP_DEFAULT_THREAD_SAFETY ? { PHP_BASE_IMAGE = "docker.io/library/php:${PHP_VERSION}-${PHP_THREAD_SAFETY}-${PHP_VARIANT}" }
         : {})
     contexts = PHP_SOURCE == "" ? {} : { php-cli-source = "target:php-cli-source" }
 }
@@ -354,7 +367,8 @@ target "php-ext-gd" {
     EXTENSION = "gd"
     BUILDDEPS = "libfreetype6-dev libjpeg-dev libpng-dev libwebp-dev libavif-dev libxpm-dev"
     CONFIGURE = "--with-freetype --with-jpeg --with-webp --with-xpm"
-    DEPS = "libfreetype6 libjpeg62 libpng16-16 libwebp7 ^libavif[0-9]+$ libxpm4"
+    # PHP 8.6+ gd also links libwebpdemux and libwebpmux
+    DEPS = "libfreetype6 libjpeg62 libpng16-16 libwebp7 libwebpdemux2 libwebpmux3 ^libavif[0-9]+$ libxpm4"
   }
 }
 target "php-ext-gd-test" {
@@ -1145,7 +1159,7 @@ group "extensions" {
     //"php-ext-imap",
     "php-ext-intl",
     "php-ext-ldap",
-    //"php-ext-mbstring",
+    "php-ext-mbstring",
     "php-ext-mysqli",
     //"php-ext-opcache",
     "php-ext-pcntl",
@@ -1212,7 +1226,7 @@ group "extensions-test" {
     //"php-ext-imap-test",
     "php-ext-intl-test",
     "php-ext-ldap-test",
-    //"php-ext-mbstring-test",
+    "php-ext-mbstring-test",
     "php-ext-mysqli-test",
     //"php-ext-opcache-test",
     "php-ext-pcntl-test",
