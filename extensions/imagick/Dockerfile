@@ -176,7 +176,7 @@ RUN mkdir -p /install/php-ext \
         /install/usr/local/include/php/ext/ \
     && ( \
         echo \
-        && echo 'if php -m | grep -q "^imagick$"; then' \
+        && echo 'if php -m | grep "^imagick$" > /dev/null; then' \
         && echo '  echo "imagick already active"' \
         && echo '  exit 1' \
         && echo 'fi' \
@@ -185,7 +185,7 @@ RUN mkdir -p /install/php-ext \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable imagick' \
-        && echo 'php -m | grep -q "^imagick$"' \
+        && echo 'php -m | grep "^imagick$" > /dev/null' \
     ) >> /install/install.sh \
     && cp /usr/src/php/ext/imagick/LICENSE \
         /install/usr/local/share/doc/php-imagick/copyright

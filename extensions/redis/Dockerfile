@@ -45,7 +45,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo 'if php -m | grep -q "^redis$"; then' \
+        && echo 'if php -m | grep "^redis$" > /dev/null; then' \
         && echo '  echo "redis already active"' \
         && echo '  exit 1' \
         && echo 'fi' \
@@ -65,7 +65,7 @@ RUN mkdir -p /install/php-ext \
         && echo 'cp php-ext/* /usr/local/lib/php/extensions/*/' \
         && echo 'cp -rP usr/* /usr/' \
         && echo 'docker-php-ext-enable redis' \
-        && echo 'php -m | grep -q "^redis$"' \
+        && echo 'php -m | grep "^redis$" > /dev/null' \
     ) > /install/install.sh \
     && chmod +x /install/install.sh \
     && cp /usr/local/lib/php/extensions/*/redis.so \

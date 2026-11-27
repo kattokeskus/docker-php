@@ -39,7 +39,7 @@ RUN mkdir -p /install/php-ext \
         echo '#!/bin/bash' \
         && echo 'set -e -o pipefail' \
         && echo \
-        && echo 'if php -m | grep -q "^xhprof$"; then' \
+        && echo 'if php -m | grep "^xhprof$" > /dev/null; then' \
         && echo '  echo "xhprof already active"' \
         && echo '  exit 1' \
         && echo 'fi' \
