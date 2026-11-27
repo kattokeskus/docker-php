@@ -40,6 +40,8 @@ RUN --mount=type=bind,from=ghcr.io/kattokeskus/docker-php/ext/${EXTENSION}:${EXT
     /ext/install.sh
 ```
 
+vips is not built for zts: php-vips custom sources and targets crash there, as libvips calls their PHP callbacks from its own threads.
+
 ## Tag Format
 
 Extension images follow this naming pattern:
@@ -118,7 +120,7 @@ ghcr.io/kattokeskus/docker-php/php-fpm:<minor>-<variant>
 - sysvsem
 - sysvshm
 - tidy
-- vips
+- vips (nts only)
 - xdebug
 - xhprof
 - xsl

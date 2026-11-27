@@ -1251,6 +1251,18 @@ group "extensions-test" {
   ]
 }
 
+/*****************************************/
+/* Extensions that are not built for zts */
+/*****************************************/
+// php-vips custom sources and targets crash on zts, as libvips calls their
+// PHP FFI callbacks from its own threads
+group "extensions-nts-only" {
+  targets = [
+    "php-ext-vips",
+    "php-ext-vips-prev"
+  ]
+}
+
 /**************/
 /* Base image */
 /**************/

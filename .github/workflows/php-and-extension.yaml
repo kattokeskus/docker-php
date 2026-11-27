@@ -52,7 +52,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "extensions=[$(./.github/hcl_get_group.sh docker-bake.hcl extensions | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
+          extensions="$(./.github/hcl_get_group.sh docker-bake.hcl extensions)"
+          if [[ "$PHP_THREAD_SAFETY" == "zts" ]]; then
+            extensions="$(grep -vxF -f <(./.github/hcl_get_group.sh docker-bake.hcl extensions-nts-only) <<< "$extensions")"
+          fi
+
+          echo "extensions=[$(echo "$extensions" | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
 
 
   php-version:
