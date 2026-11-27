@@ -88,8 +88,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     && apt-get install -y -qq \
         redis
 
-RUN pecl install igbinary
-
 # TODO: Add sentinel
 RUN --mount=type=bind,from=php-ext-redis-build,source=/usr/src/php,target=/src/php,rw \
     --mount=type=bind,source=patches,target=/usr/src/php-test-patches \

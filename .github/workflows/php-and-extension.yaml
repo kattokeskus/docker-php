@@ -29,10 +29,6 @@ permissions:
 env:
   # Read by docker-bake.hcl and build_hash.sh
   PHP_THREAD_SAFETY: ${{ inputs.php-thread-safety }}
-  # Variant in image tags and names: trixie for nts, trixie-zts for zts
-  IMAGE_VARIANT: ${{ inputs.php-thread-safety == 'zts' && format('{0}-zts', inputs.php-variant) || inputs.php-variant }}
-  # There is no zts php-fpm
-  BASE_IMAGES: ${{ inputs.php-thread-safety == 'zts' && 'php-base,php-ext-base' || 'php-base,php-ext-base,php-fpm' }}
 
 jobs:
   parse-extensions:
@@ -46,15 +42,25 @@ jobs:
           sparse-checkout: |
             *.hcl
             .github/hcl_get_group.sh
+            .github/hcl_get_variable.sh
           sparse-checkout-cone-mode: false
       - name: Parse extensions
         id: parse-extensions
+        env:
+          INPUT_PHP_VERSION: ${{ inputs.php-version }}
         run: |
           set -euo pipefail
 
           extensions="$(./.github/hcl_get_group.sh docker-bake.hcl extensions)"
           if [[ "$PHP_THREAD_SAFETY" == "zts" ]]; then
             extensions="$(grep -vxF -f <(./.github/hcl_get_group.sh docker-bake.hcl extensions-nts-only) <<< "$extensions")"
+          fi
+
+          # vars-<minor>.hcl may list extensions that are not built for that PHP version
+          excluded="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" EXCLUDED_EXTENSIONS 2>/dev/null || true)"
+          if [[ -n "$excluded" ]]; then
+            echo "Excluded extensions: ${excluded}"
+            extensions="$(grep -vxF -f <(tr ',' '\n' <<< "$excluded" | sed -e 's#^[[:space:]]*#php-ext-#' -e 's#[[:space:]]*$##') <<< "$extensions")"
           fi
 
           echo "extensions=[$(echo "$extensions" | sed -e 's#^php-ext-##' -e 's#^#"#' -e 's#$#"#' | tr '\n' ',' | sed 's#,$##')]" >> $GITHUB_OUTPUT
@@ -65,6 +71,9 @@ jobs:
     runs-on: ubuntu-26.04
     outputs:
       php-version: ${{ steps.php-version.outputs.php-version }}
+      default-thread-safety: ${{ steps.php-version.outputs.default-thread-safety }}
+      image-variant: ${{ steps.php-version.outputs.image-variant }}
+      base-images: ${{ steps.php-version.outputs.base-images }}
       build-hash: ${{ steps.build-hash.outputs.build-hash }}
       available: ${{ steps.build-hash.outputs.available }}
       tag-available: ${{ steps.build-hash.outputs.tag-available }}
@@ -96,16 +105,36 @@ jobs:
         id: php-version
         env:
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
+          PHP_VARIANT: ${{ inputs.php-variant }}
         run: |
           set -euo pipefail
           PHP_VERSION=$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_VERSION)
           echo "php-version=${PHP_VERSION}" >> $GITHUB_OUTPUT
+
+          # The thread safety of the default official images, nts unless vars-<minor>.hcl sets it
+          default_thread_safety="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" PHP_DEFAULT_THREAD_SAFETY 2>/dev/null || true)"
+          default_thread_safety="${default_thread_safety:-nts}"
+          echo "default-thread-safety=${default_thread_safety}" >> $GITHUB_OUTPUT
+
+          # Variant in image tags and names: trixie for the default thread
+          # safety, trixie-nts or trixie-zts for the other one. php-fpm builds
+          # on the official php-fpm image, which has the default thread safety only.
+          image_variant="$PHP_VARIANT"
+          base_images="php-base,php-ext-base"
+          if [[ "$PHP_THREAD_SAFETY" == "$default_thread_safety" ]]; then
+            base_images+=",php-fpm"
+          else
+            image_variant+="-${PHP_THREAD_SAFETY}"
+          fi
+          echo "image-variant=${image_variant}" >> $GITHUB_OUTPUT
+          echo "base-images=${base_images}" >> $GITHUB_OUTPUT
       - name: Get build hash
         id: build-hash
         env:
           PHP_VERSION: ${{ steps.php-version.outputs.php-version }}
           INPUT_PHP_VERSION: ${{ inputs.php-version }}
           PHP_VARIANT: ${{ inputs.php-variant }}
+          IMAGE_VARIANT: ${{ steps.php-version.outputs.image-variant }}
           REGISTRY_TOKEN: ${{ steps.registry-token.outputs.token }}
         run: |
           set -euo pipefail
@@ -185,7 +214,9 @@ jobs:
             build_hash=$(./.github/build_hash.sh "$INPUT_PHP_VERSION" "$PHP_VARIANT" "$extension")
 
             ext_version_var=$(echo "$extension" | tr '-' '_' | tr '[:lower:]' '[:upper:]')_VERSION
-            ext_version="$(./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
+            # vars-<minor>.hcl may override the extension version from vars.hcl
+            ext_version="$(./.github/hcl_get_variable.sh "vars-${INPUT_PHP_VERSION}.hcl" "$ext_version_var" 2>/dev/null \
+              || ./.github/hcl_get_variable.sh vars.hcl "$ext_version_var" 2>/dev/null || true)"
             if [[ -z "$ext_version" ]]; then
               ext_version="${PHP_VERSION}"
             fi
@@ -273,6 +304,9 @@ jobs:
       # Try to build all images even some failed to build
       fail-fast: false
     runs-on: ${{ matrix.os }}
+    env:
+      IMAGE_VARIANT: ${{ needs.php-version.outputs.image-variant }}
+      BASE_IMAGES: ${{ needs.php-version.outputs.base-images }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -414,6 +448,9 @@ jobs:
   merge-base-images:
     needs: [php-version, build-base-images]
     runs-on: ubuntu-26.04
+    env:
+      IMAGE_VARIANT: ${{ needs.php-version.outputs.image-variant }}
+      BASE_IMAGES: ${{ needs.php-version.outputs.base-images }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -485,6 +522,9 @@ jobs:
       needs.php-version.outputs.tag-available == '0'
     needs: [php-version, merge-base-images]
     runs-on: ubuntu-26.04
+    env:
+      IMAGE_VARIANT: ${{ needs.php-version.outputs.image-variant }}
+      BASE_IMAGES: ${{ needs.php-version.outputs.base-images }}
     steps:
       - name: Login to Github Container Registry
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -526,6 +566,7 @@ jobs:
       php-version: ${{ inputs.php-version }}
       php-variant: ${{ inputs.php-variant }}
       php-thread-safety: ${{ inputs.php-thread-safety }}
+      php-default-thread-safety: ${{ needs.php-version.outputs.default-thread-safety }}
       extensions: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.php-version.outputs.extensions-without-tags || needs.php-version.outputs.extensions }}
       extensions-to-build: ${{ needs.php-version.outputs.extensions }}
       extension-build-hashes: ${{ needs.php-version.outputs.extension-build-hashes }}

@@ -144,6 +144,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     && php -m | grep "^FFI$" > /dev/null \
     && vips --version
 
+# PHPUnit needs mbstring, which the official PHP 8.6+ images no longer build in
+RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
+    --mount=type=cache,target=/var/lib/apt,sharing=private \
+    php -m | grep "^mbstring$" > /dev/null || ( \
+        apt-get update \
+        && apt-get install -y -qq \
+            libonig-dev \
+            $PHPIZE_DEPS \
+        && docker-php-ext-install mbstring \
+    )
+
 COPY --from=php-vips-source /usr/src/php-vips /usr/src/php-vips
 
 RUN --mount=type=bind,from=vips-build,source=/usr/src/vips,target=/src/vips,rw \

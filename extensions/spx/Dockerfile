@@ -8,12 +8,15 @@ ARG BUILDARCH
 ARG GCC_VERSION=14
 
 # NOTE! source directory must be exactly php-spx, otherwise tests will fail
+# SPX_VERSION is a release tag without the "v", or a git commit when no release supports the PHP version
+# libzstd-dev: SPX 0.5+ writes Zstandard compressed reports when it is available
 ARG SPX_VERSION
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends zlib1g-dev \
+    && apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev \
     && mkdir -p /usr/src/php/ext \
     && cd /usr/src/php/ext \
-    && curl -sfL -o spx-${SPX_VERSION}.tar.gz https://github.com/NoiseByNorthwest/php-spx/archive/refs/tags/v${SPX_VERSION}.tar.gz \
+    && (curl -sfL -o spx-${SPX_VERSION}.tar.gz https://github.com/NoiseByNorthwest/php-spx/archive/refs/tags/v${SPX_VERSION}.tar.gz \
+        || curl -sfL -o spx-${SPX_VERSION}.tar.gz https://github.com/NoiseByNorthwest/php-spx/archive/${SPX_VERSION}.tar.gz) \
     && tar -xzf spx-${SPX_VERSION}.tar.gz \
     && mv php-spx-${SPX_VERSION} php-spx \
     && rm spx-${SPX_VERSION}.tar.gz
@@ -74,6 +77,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
     --mount=type=bind,from=php-ext-spx,target=/usr/src/php-ext-spx \
     /usr/src/php-ext-spx/install.sh
 
+# SPX 0.5+ report tests read Zstandard compressed reports with zstdcat
+RUN --mount=type=cache,target=/var/cache/apt,sharing=private \
+    --mount=type=cache,target=/var/lib/apt,sharing=private \
+    apt-get update \
+    && apt-get install -y -qq --no-install-recommends \
+        zstd
+
 RUN --mount=type=bind,from=php-ext-spx-build,source=/usr/src/php,target=/src/php,rw \
     mkdir -p /usr/src/php/ext \
     && cp -r /src/php/ext/php-spx /usr/src/php/ext/php-spx \
@@ -82,7 +92,8 @@ RUN --mount=type=bind,from=php-ext-spx-build,source=/usr/src/php,target=/src/php
     && cp .libs/spx.lai modules/spx.la \
     && echo '#!/bin/bash' > run.sh \
     && echo 'set -e -o pipefail' >> run.sh \
-    && echo 'php run-tests.php -j$(nproc) -q' >> run.sh \
+    # Serially: the SPX 0.5 GC tracing tests are flaky when run in parallel
+    && echo 'php run-tests.php -j1 -q' >> run.sh \
     && chmod +x run.sh
 
 WORKDIR /usr/src/php/ext/php-spx
